@@ -1,7 +1,7 @@
 -module(files).
 -include_lib("kernel/include/file.hrl").
 
--export([walk_file_tree/1]).
+-export([walk_file_tree/1, get_added_files/2]).
 
 gen_file_signature(Filename, F) ->
     {SignatureResult, Data} = F(Filename),
@@ -53,7 +53,7 @@ walk_file_tree([File|Rest], L) when is_list(File) ->
                     case Result of 
                         ok ->
                             {FileNameSignature, FileSignature} = Data,
-                            walk_file_tree(Rest, [{FileNameSignature, FileSignature, last_write_time(File)}|L]);
+                            walk_file_tree(Rest, [{FileNameSignature, FileSignature, File, last_write_time(File)}|L]);
                         _ -> walk_file_tree(Rest, L)
                     end
              end
@@ -61,7 +61,7 @@ walk_file_tree([File|Rest], L) when is_list(File) ->
 
 walk_file_tree(File) ->
     Sigs = walk_file_tree([File], []),
-    lists:sort(fun({X,_,{{_,_,_},{_,_,_}}},{Y,_,{{_,_,_},{_,_,_}}}) -> X < Y end, Sigs).
+    lists:sort(fun({X,_,_,{{_,_,_},{_,_,_}}},{Y,_,_,{{_,_,_},{_,_,_}}}) -> X < Y end, Sigs).
 
 add_this_path(Path) ->
     (fun(Filename) -> Path ++ "/" ++ Filename end).
@@ -74,4 +74,15 @@ last_write_time(Filename) ->
         Error -> Error 
     end.
 
+get_added_files(OldFileSet,File) ->
+    NewFileList = walk_file_tree(File),
+    NewFileSet = sets:from_list(NewFileList),
+    sets:subtract(NewFileSet, OldFileSet).
 
+%MyList = files:walk_file_tree("/home/barney/git/fs/src").
+%MySet = sets:from_list(MyList).
+%MyNewList = files:walk_file_tree("/home/barney/git/fs/src").
+%MyNewSet = sets:from_list(MyNewList).
+%DiffSet = sets:subtract(MyNewSet, MySet).
+%DiffSet2 = sets:subtract(MySet, MyNewSet).
+%sets:to_list(DiffSet2).
