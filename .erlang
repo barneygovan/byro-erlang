@@ -1,2 +1,4 @@
 io:format("Running Erlang~n").
 code:add_patha("ebin").
+
+code:load_file(user_default).
