@@ -36,11 +36,11 @@ is_symlink(Filename) ->
     end.
 
 walk_file_tree(Files, L) ->
-    walk_file_tree(Files, L, nil, []).
+    walk_file_tree(Files, L, []).
 
-walk_file_tree([], L, _, _) -> 
+walk_file_tree([], L, _) -> 
     L;
-walk_file_tree([File|Rest], L, FilterFun, IgnoreList) when is_list(File) ->
+walk_file_tree([File|Rest], L, IgnoreList) when is_list(File) ->
     case is_symlink(File) of 
         true ->
             walk_file_tree(Rest, L);
@@ -48,42 +48,40 @@ walk_file_tree([File|Rest], L, FilterFun, IgnoreList) when is_list(File) ->
             case filelib:is_dir(File) of
                 true -> 
                     {ok, Children} = file:list_dir(File),
-                    case FilterFun == nil of
-                        false ->
-                            ChildrenPaths = lists:map(add_this_path(File), filter_files(FilterFun,IgnoreList,Children));
-                        true ->
-                            ChildrenPaths = lists:map(add_this_path(File), Children)
-                        end,
-                    DirList = walk_file_tree(ChildrenPaths, L),
-                    walk_file_tree(Rest, DirList);
+                    ChildrenPaths = lists:map(add_this_path(File), filter_files(IgnoreList,Children,File)),
+                    DirList = walk_file_tree(ChildrenPaths, L, IgnoreList),
+                    walk_file_tree(Rest, DirList, IgnoreList);
                 false -> 
                     {Result, Data} = signature(File, sha1),
                     case Result of 
                         ok ->
                             {FileNameSignature, FileSignature} = Data,
-                            walk_file_tree(Rest, [{FileNameSignature, FileSignature, File, last_write_time(File)}|L]);
-                        _ -> walk_file_tree(Rest, L)
+                            walk_file_tree(Rest, [{FileNameSignature, FileSignature, File, last_write_time(File)}|L], IgnoreList);
+                        _ -> walk_file_tree(Rest, L, IgnoreList)
                     end
              end
     end.
 
-get_file_list(File,FilterFun,IgnoreList) ->
-    Sigs = walk_file_tree([File],[],FilterFun,IgnoreList),
-    lists:sort(fun({X,_,_,{{_,_,_},{_,_,_}}},{Y,_,_,{{_,_,_},{_,_,_}}}) -> X < Y end, Sigs).
+get_file_list(File,IgnoreList) when is_list(IgnoreList) ->
+    Sigs = walk_file_tree([File],[],IgnoreList),
+    lists:sort(fun({X,_,_,{{_,_,_},{_,_,_}}},{Y,_,_,{{_,_,_},{_,_,_}}}) -> X < Y end, Sigs);
+get_file_list(File,PathType) when is_atom(PathType) ->
+    get_file_list(File,PathType,[]).
 
-get_file_list(File,relative,FilterFun,IgnoreList) ->
+get_file_list(File,relative,IgnoreList) ->
     case filelib:is_dir(File) of
         true ->
+            {_Result, Cwd} = file:get_cwd(),
             shell_default:cd(File),
-            get_file_list(".", FilterFun,IgnoreList);
+            FileList = get_file_list(".",IgnoreList),
+            shell_default:cd(Cwd),
+            FileList;
         false ->
             {error, "You must supply a path to a root directory"}
     end;
-get_file_list(File,absolute,FilterFun,IgnoreList) ->
-    get_file_list(File,FilterFun,IgnoreList).
+get_file_list(File,absolute,IgnoreList) ->
+    get_file_list(File,IgnoreList).
 
-get_file_list(File,PathType)->
-    get_file_list(File,PathType,nil,[]).
 
 get_file_list(File) ->
     get_file_list(File, relative).
@@ -92,20 +90,17 @@ get_filtered_file_list(File,IgnoreList) ->
     get_filtered_file_list(File,IgnoreList,relative).
 
 get_filtered_file_list(File,IgnoreList,PathType) ->
-    DontMatchMe = fun(Pat) -> (fun(X) -> case re:run(X, Pat) of {match,_}-> false; nomatch->true end end) end,
-    get_file_list(File,PathType,DontMatchMe,IgnoreList).
+    get_file_list(File,PathType,IgnoreList).
 
-filter_files(_, [], L) ->
-    lists:reverse(L);
-filter_files(FilterFun, [CurrentPattern|Rest], L) ->
-    {Result, Regexp} = re:compile(CurrentPattern),
-    case Result of
-        ok ->
-            filter_files(FilterFun, Rest, lists:filter(FilterFun(Regexp), L));
-        Error -> Error
-    end.
+filter_files([], L, _) ->
+    L;
+filter_files([CurrentPattern|Rest], L, Cwd) ->
+    Excluded = filelib:wildcard(CurrentPattern, Cwd),
+    filter_files(Rest, lists:filter(fun(X) -> lists:member(X, Excluded) =:= false end, L), Cwd).
     
 
+add_this_path(".") ->
+    (fun(Filename) -> Filename end);
 add_this_path(Path) ->
     (fun(Filename) -> Path ++ "/" ++ Filename end).
 
