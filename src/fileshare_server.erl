@@ -20,7 +20,7 @@ init([]) ->
     {ok, 0}.
 
 handle_call({listfiles, Root, IgnoreList}, _From, N) ->
-    {reply, files:get_filtered_file_list(Root, IgnoreList), N+1}.
+    {reply, lib_files:get_filtered_file_list(Root, IgnoreList), N+1}.
 
 handle_cast(_Msg, N) -> {noreply, N}.
 
