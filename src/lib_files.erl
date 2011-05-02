@@ -35,52 +35,51 @@ is_symlink(Filename) ->
         _ -> false
     end.
 
-walk_file_tree(Files, L) ->
-    walk_file_tree(Files, L, []).
+%walk_file_tree(Files, L, RootDir) ->
+%    walk_file_tree(Files, L, [], RootDir).
 
-walk_file_tree([], L, _) -> 
+walk_file_tree([], L, _, _) -> 
     L;
-walk_file_tree([File|Rest], L, IgnoreList) when is_list(File) ->
+walk_file_tree([File|Rest], L, IgnoreList, RootDir) when is_list(File) ->
     case is_symlink(File) of 
         true ->
-            walk_file_tree(Rest, L);
+            walk_file_tree(Rest, L, IgnoreList, RootDir);
         false -> 
             case filelib:is_dir(File) of
                 true -> 
-                    {ok, Children} = file:list_dir(File),
+                    {ok, Children} = file:list_dir(filename:absname(File, RootDir)),
                     ChildrenPaths = lists:map(add_this_path(File), filter_files(IgnoreList,Children,File)),
-                    DirList = walk_file_tree(ChildrenPaths, L, IgnoreList),
-                    walk_file_tree(Rest, DirList, IgnoreList);
+                    DirList = walk_file_tree(ChildrenPaths, L, IgnoreList, RootDir),
+                    walk_file_tree(Rest, DirList, IgnoreList, RootDir);
                 false -> 
                     {Result, Data} = signature(File, sha1),
                     case Result of 
                         ok ->
                             {FileNameSignature, FileSignature} = Data,
-                            walk_file_tree(Rest, [{FileNameSignature, FileSignature, File, last_write_time(File)}|L], IgnoreList);
-                        _ -> walk_file_tree(Rest, L, IgnoreList)
+                            walk_file_tree(Rest, [{FileNameSignature, FileSignature, File, last_write_time(File)}|L], IgnoreList, RootDir);
+                        _ -> walk_file_tree(Rest, L, IgnoreList,RootDir)
                     end
              end
     end.
 
-get_file_list(File,IgnoreList) when is_list(IgnoreList) ->
-    Sigs = walk_file_tree([File],[],IgnoreList),
-    lists:sort(fun({X,_,_,{{_,_,_},{_,_,_}}},{Y,_,_,{{_,_,_},{_,_,_}}}) -> X < Y end, Sigs);
+
 get_file_list(File,PathType) when is_atom(PathType) ->
     get_file_list(File,PathType,[]).
 
+get_file_list(File,IgnoreList,RootDir) when is_list(IgnoreList) ->
+    Sigs = walk_file_tree([File],[],IgnoreList,RootDir),
+    lists:sort(fun({X,_,_,{{_,_,_},{_,_,_}}},{Y,_,_,{{_,_,_},{_,_,_}}}) -> X < Y end, Sigs);
 get_file_list(File,relative,IgnoreList) ->
     case filelib:is_dir(File) of
         true ->
             {_Result, Cwd} = file:get_cwd(),
-            shell_default:cd(File),
-            FileList = get_file_list(".",IgnoreList),
-            shell_default:cd(Cwd),
+            FileList = get_file_list(File,IgnoreList,Cwd),
             FileList;
         false ->
             {error, "You must supply a path to a root directory"}
     end;
 get_file_list(File,absolute,IgnoreList) ->
-    get_file_list(File,IgnoreList).
+    get_file_list(File,IgnoreList,"").
 
 
 get_file_list(File) ->

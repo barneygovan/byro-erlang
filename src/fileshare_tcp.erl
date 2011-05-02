@@ -10,23 +10,23 @@ start_fileshare_client(Host, Port, PacketLength) ->
 
 %% This is the server API
 start_fileshare_server(Port, Fun, Max, PacketLength) ->
-  Name = port_name(Port).
+  Name = port_name(Port),
   case whereis(Name) of
     undefined ->
-      Self = self().
+      Self = self(),
       Pid = spawn_link(fun() -> startup(Self, Port, Fun, Max, PacketLength) end),
       receive 
         {Pid, ok} -> 
           register(Name, Pid),
           {ok, self()};
         {Pid, error} ->
-          Error
+          error
       end;
     _Pid ->
       {error, already_started}
   end.
       
-stop(Port) -> when is_integer(Port) ->
+stop(Port) when is_integer(Port) ->
   Name = port_name(Port),
   case whereis(Name) of
     undefined ->
@@ -48,15 +48,15 @@ port_name(Port) when is_integer(Port) ->
 
 startup(Master, Port, Fun, Max, PacketLength) ->
   process_flag(trap_exit, true),
-  io:format("Starting a port server on ~p...~n", [Port]).
+  io:format("Starting a port server on ~p...~n", [Port]),
   case gen_tcp:listen(Port, [binary, 
                             %% {dontroute, true},
                             {nodelay, true},
                             {packet, PacketLength},
                             {reuseaddr, true},
-                            {active, true}} of
+                            {active, true}]) of
     {ok, Listen} -> 
-      io:format("Listening to: ~p~n", [Listen]).
+      io:format("Listening to: ~p~n", [Listen]),
       Master ! {self(), ok},
       New = start_accept(Listen, Fun),
       %% Now we're ready to run
@@ -92,8 +92,8 @@ start_child(Parent, Listen, Fun) ->
         end
   end.
 
-socket_loop(Listen, New, Active, Fun, Max) ->
-  receive 
-    {isstarted, New} ->
-      Active1 = [New|Active],
+%socket_loop(Listen, New, Active, Fun, Max) ->
+%  receive 
+%    {isstarted, New} ->
+%      Active1 = [New|Active],
       
