@@ -1,6 +1,6 @@
 -module(fileshare_tcp).
 
--export([start_fileshare_fserver/4, start_fileshare_client/3]).
+-export([start_fileshare_server/4, start_fileshare_client/3]).
 -export([stop/1]).
 -export([children/1]).
 
@@ -92,8 +92,33 @@ start_child(Parent, Listen, Fun) ->
         end
   end.
 
-%socket_loop(Listen, New, Active, Fun, Max) ->
-%  receive 
-%    {isstarted, New} ->
-%      Active1 = [New|Active],
-      
+socket_loop(Listen, New, Active, Fun, Max) ->
+  receive 
+    {isstarted, New} ->
+      Active1 = [New|Active],
+      possibly_start_another(false,Listen,Active1,Fun,Max);
+    {'EXIT', New, Why} ->
+      io:format("Child exit=~p~n", [Why]),
+      possibly_start_another(false,Listen,Active,Fun,Max);
+    {'EXIT', Pid, Why} ->
+      io:format("Child exit=~p~n", [Why]),
+      Active1 = lists:delete(Pid, Active),
+      possibly_start_another(New,Listen,Active1,Fun,Max);
+    {children, From} ->
+      From ! {session_server, Active},
+      socket_loop(Listen,New,Active,Fun,Max);
+    _Other ->
+      socket_loop(Listen,New,Active,Fun,Max)
+  end.
+
+possibly_start_another(New,Listen,Active,Fun,Max) when is_pid(New) -> 
+  socket_loop(Listen,New,Active,Fun,Max);
+possibly_start_another(false,Listen,Active,Fun,Max) ->
+  case length(Active) of 
+    N when N < Max ->
+      New = start_accept(Listen, Fun),
+      socket_loop(Listen, New, Active, Fun, Max);
+    _ -> 
+      socket_loop(Listen,false,Active,Fun,Max)
+  end.
+
