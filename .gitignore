@@ -1,3 +1,6 @@
 *.beam
 *.swp
 logs/
+.settings/
+.directory
+.project
