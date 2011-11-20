@@ -1,0 +1,6 @@
+io:format("Running Erlang~n").
+code:add_patha("bodleian/ebin").
+code:add_patha("mochiweb/ebin").
+code:add_patha("jsonerl/ebin").
+
+code:load_file(user_default).

@@ -3,4 +3,5 @@
 logs/
 .settings/
 .directory
-.project
+mochiweb/
+jsonerl/
