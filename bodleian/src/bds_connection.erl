@@ -15,9 +15,13 @@
 %% External exports
 -export([start_link/0,
          start_link/1,
+         start_link/2,
+         start_link/3,
          create/0,
          create/1,
          delete/1,
+         create_user/2,
+         delete_user/2,
          get_manifest_list/2,
          get_manifest/3,
          put_manifest/3,
@@ -32,16 +36,25 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -define(DEFAULT_TIMEOUT, 3000).
--record(state, {timeout}).
+-define(DEFAULT_PORT, 5984).
+-define(DEFAULT_HOST, "127.0.0.1").
+
+-record(state, {timeout, host, port}).
 
 %% ====================================================================
 %% External functions
 %% ====================================================================
 start_link() ->
-    start_link(?DEFAULT_TIMEOUT).
+    start_link(?DEFAULT_HOST, ?DEFAULT_PORT, ?DEFAULT_TIMEOUT).
 
 start_link(Timeout) ->
-    gen_server:start_link(?MODULE, [Timeout], []).
+    start_link(?DEFAULT_HOST, ?DEFAULT_PORT, Timeout).
+
+start_link(Host, Port) ->
+    start_link(Host, Port, ?DEFAULT_TIMEOUT).
+
+start_link(Host, Port, Timeout) ->
+    gen_server:start_link(?MODULE, [Timeout, Host, Port], []).
 
 create() ->
     create(?DEFAULT_TIMEOUT).
@@ -51,6 +64,12 @@ create(Timeout) ->
 
 delete(Pid) ->
     gen_server:cast(Pid, delete).
+
+create_user(Pid, User) ->
+    gen_server:call(Pid, {create_user, User}).
+
+delete_user(Pid, User) ->
+    gen_server:call(Pid, {delete_user, User}).
 
 get_manifest_list(Pid, User) ->
     gen_server:call(Pid, {get_manifest_list, User}).
@@ -91,8 +110,8 @@ delete_file(Pid, Id, User) ->
 %%          ignore               |
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
-init([Timeout]) ->
-    {ok, #state{timeout=Timeout}, Timeout}.
+init([Timeout, Host, Port]) ->
+    {ok, #state{timeout=Timeout, host=Host, port=Port}, Timeout}.
 
 %% --------------------------------------------------------------------
 %% Function: handle_call/3
@@ -104,6 +123,36 @@ init([Timeout]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
+handle_call({create_user, User}, _From, State) ->
+    Url = create_url(State#state.host, State#state.port, User),
+    bds_event:create_user(Url),
+    {ok, {{_Version, StatusCode, _Result}, _Headers, _Body}} =
+        httpc:request(put, {Url, [], "application/json", []}, [], []),
+    case StatusCode of
+        201 ->
+            {reply, ok, State, State#state.timeout};
+        412 ->
+            ErrorMsg = io_lib:format("User already exists: ~s", [Url]),
+            {reply, {error, ErrorMsg}, State, State#state.timeout};
+        _ ->
+            ErrorMsg = io_lib:format("Unknown error occurred trying to create user: ~s", [Url]),
+            {reply, {error, ErrorMsg}, State, State#state.timeout}
+    end;
+handle_call({delete_user, User}, _From, State) ->
+    Url = create_url(State#state.host, State#state.port, User),
+    bds_event:delete_user(Url),
+    {ok, {{_Version, StatusCode, _Result}, _Headers, _Body}} = 
+        httpc:request(delete, {Url, []}, [], []),
+    case StatusCode of
+        200 -> 
+            {reply, ok, State, State#state.timeout};
+        404 ->
+            ErrorMsg = io_lib:format("No such user exists: ~s", [Url]),
+            {reply, {error, ErrorMsg}, State, State#state.timeout};
+        _ ->
+            ErrorMsg = io_lib:format("Unknown error occurred trying to delete user: ~s", [Url]),
+            {reply, {error, ErrorMsg}, State, State#state.timeout}
+    end;
 handle_call({get_manifest_list, User}, _From, State) ->
     ManifestList = [],
     {reply, {ok, ManifestList}, State, State#state.timeout};
@@ -165,4 +214,12 @@ code_change(_OldVsn, State, _Extra) ->
 %% --------------------------------------------------------------------
 %%% Internal functions
 %% --------------------------------------------------------------------
-
+create_url(Host, Port, Database) ->
+    create_url(Host, Port, Database, []).
+create_url(Host, Port, Database, Path) ->
+    case Path of
+        [] ->
+            lists:flatten(io_lib:format("http://~s:~w/~s", [Host, Port, Database]));
+        _ ->
+            lists:flatten(io_lib:format("http://~s:~w/~s/~s", [Host, Port, Database, Path]))
+    end.

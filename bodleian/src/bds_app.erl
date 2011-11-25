@@ -47,6 +47,7 @@ start(_Type, _StartArgs) ->
     ok = locate_document_store(),
     case bds_sup:start_link() of
 	{ok, Pid} ->
+        bds_event_logger:add_handler(),
 	    {ok, Pid};
 	Error ->
 	    Error

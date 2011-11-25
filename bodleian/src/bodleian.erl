@@ -10,7 +10,9 @@
 %%
 %% Exported Functions
 %%
--export([get_manifest_list/1,
+-export([create_user/1,
+         delete_user/1,
+         get_manifest_list/1,
          get_manifest/2,
          put_manifest/2,
          update_manifest/3,
@@ -23,8 +25,25 @@
 %%
 %% API Functions
 %%
+create_user(User) ->
+    {ok, Pid} = bds_connection:create(),
+    Result = bds_connection:create_user(Pid, User),
+    bds_connection:delete(Pid),
+    case Result of
+        ok -> ok;
+        {error, Reason} ->
+            bds_event:log_error(Reason),
+            error
+    end.
+
+delete_user(User) ->
+    {ok, Pid} = bds_connection:create(),
+    ok = bds_connection:delete_user(Pid, User),
+    bds_connection:delete(Pid),
+    ok.
+
 get_manifest_list(User) ->
-    {ok, Pid} = bds_connection:create(1000),
+    {ok, Pid} = bds_connection:create(),
     {ok, ManifestList} = bds_connection:get_manifest_list(Pid, User),
     bds_connection:delete(Pid),
     {ok, ManifestList}.

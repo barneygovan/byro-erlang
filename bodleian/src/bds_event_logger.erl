@@ -13,10 +13,16 @@
 
 %% --------------------------------------------------------------------
 %% External exports
--export([add_handler/0, delete_handler/0]).
+-export([add_handler/0, 
+         delete_handler/0]).
 
 %% gen_event callbacks
--export([init/1, handle_event/2, handle_call/2, handle_info/2, terminate/2, code_change/3]).
+-export([init/1, 
+         handle_event/2, 
+         handle_call/2, 
+         handle_info/2, 
+         terminate/2, 
+         code_change/3]).
 
 -record(state, {}).
 
@@ -46,6 +52,12 @@ init([]) ->
 %%          {swap_handler, Args1, State1, Mod2, Args2} |
 %%          remove_handler
 %% --------------------------------------------------------------------
+handle_event({create_user, User}, State) ->
+    error_logger:info_msg("create_user[~s]~n", [User]),
+    {ok, State};
+handle_event({delete_user, User}, State) ->
+    error_logger:info_msg("delete_user[~w]~n", [User]),
+    {ok, State};
 handle_event({get_manifest, {Id, User}}, State) ->
     error_logger:info_msg("get_manifest[~w, ~w]~n", [Id, User]),
     {ok, State};
@@ -57,6 +69,9 @@ handle_event({get_file, {Id, User}}, State) ->
     {ok, State};
 handle_event({put_file, {Id, User}}, State) ->
     error_logger:info_msg("put_file[~w, ~w]~n", [Id, User]),
+    {ok, State};
+handle_event({log_error, Error}, State) ->
+    error_logger:error_msg("ERROR: ~s~n", [Error]),
     {ok, State};
 handle_event(_Event, State) ->
     {ok, State}.

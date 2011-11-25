@@ -13,10 +13,13 @@
 -export([start_link/0,
          add_handler/2,
          delete_handler/2,
+         create_user/1,
+         delete_user/1,
          get_manifest/2,
          put_manifest/2,
          get_file/2,
-         put_file/2]).
+         put_file/2,
+         log_error/1]).
 
 -define(SERVER, ?MODULE).
 
@@ -32,6 +35,12 @@ add_handler(Handler, Args) ->
 delete_handler(Handler, Args) ->
     gen_event:delete_handler(?SERVER, Handler, Args).
 
+create_user(User) ->
+    gen_event:notify(?SERVER, {create_user, User}).
+
+delete_user(User) ->
+    gen_event:notify(?SERVER, {delete_user, User}).
+
 get_manifest(Id, User) ->
     gen_event:notify(?SERVER, {get_manifest, {Id, User}}).
 
@@ -43,6 +52,9 @@ get_file(Id, User) ->
 
 put_file(Id, User) ->
     gen_event:notify(?SERVER, {put_file, {Id, User}}).
+
+log_error(Error) ->
+    gen_event:notify(?SERVER, {log_error, Error}).
 
 %%
 %% Local Functions
