@@ -14,7 +14,8 @@
 %%
 -export([add_header/3,
          strip_header/1,
-         get_docs_from_couchdb_response/1]).
+         get_docs_from_couchdb_response/1,
+         create_user_views/0]).
 
 %%
 %% API Functions
@@ -31,6 +32,12 @@ get_docs_from_couchdb_response(Doc) ->
     CouchDbResponse = rfc4627:to_record(Doc, #couchdb_response{}, record_info(fields, couchdb_response)),
     CouchDbResponse#couchdb_response.rows.
 %   {ok, DecodedBody, _Raw} = rfc4627:decode(Doc).
+
+create_user_views() ->
+    ManifestView = {obj, [{map, <<"function(doc) {\n  if(doc.type == \"manifest\")\n  emit(null, doc);\n}">>}]},
+    Views = {obj, [{get_manifest_list, ManifestView}]},          
+    rfc4627:encode({obj, [{language, <<"javascript">>},
+                          {views, Views}]}).
 
 %%
 %% Local Functions

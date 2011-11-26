@@ -130,7 +130,16 @@ handle_call({create_user, User}, _From, State) ->
         httpc:request(put, {Url, [], "application/json", []}, [], []),
     case StatusCode of
         201 ->
-            {reply, ok, State, State#state.timeout};
+            ViewUrl = create_view_url(State#state.host, State#state.port, User),
+            {ok, {{_, ViewStatusCode, _}, _, _}} = 
+                httpc:request(put, {ViewUrl, [], "application/json", jsondoc_utils:create_user_views()}, [], []),
+            case ViewStatusCode of
+                201 -> 
+                    {reply, ok, State, State#state.timeout};
+                _ ->
+                    ErrorMsg = io_lib:format("Unknown error occurred creating views for new user: ~s", [Url]),
+                    {reply, {error, ErrorMsg}, State, State#state.timeout}
+            end;
         412 ->
             ErrorMsg = io_lib:format("User already exists: ~s", [Url]),
             {reply, {error, ErrorMsg}, State, State#state.timeout};
@@ -223,3 +232,7 @@ create_url(Host, Port, Database, Path) ->
         _ ->
             lists:flatten(io_lib:format("http://~s:~w/~s/~s", [Host, Port, Database, Path]))
     end.
+
+create_view_url(Host, Port, Database) ->
+    lists:flatten(io_lib:format("http://~s:~w/~s/_design/bodleian", [Host, Port, Database])).
+
