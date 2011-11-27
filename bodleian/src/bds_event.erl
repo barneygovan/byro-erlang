@@ -16,10 +16,11 @@
          create_user/1,
          delete_user/1,
          get_manifest/2,
-         put_manifest/2,
+         create_manifest/2,
          get_file/2,
-         put_file/2,
-         log_error/1]).
+         create_file/2,
+         log_error/1,
+         log_response/1]).
 
 -define(SERVER, ?MODULE).
 
@@ -44,17 +45,20 @@ delete_user(User) ->
 get_manifest(Id, User) ->
     gen_event:notify(?SERVER, {get_manifest, {Id, User}}).
 
-put_manifest(Id, User) ->
-    gen_event:notify(?SERVER, {put_manifest, {Id, User}}).
+create_manifest(Id, User) ->
+    gen_event:notify(?SERVER, {create_manifest, {Id, User}}).
 
 get_file(Id, User) ->
     gen_event:notify(?SERVER, {get_file, {Id, User}}).
 
-put_file(Id, User) ->
-    gen_event:notify(?SERVER, {put_file, {Id, User}}).
+create_file(Id, User) ->
+    gen_event:notify(?SERVER, {create_file, {Id, User}}).
 
 log_error(Error) ->
     gen_event:notify(?SERVER, {log_error, Error}).
+
+log_response(Response) ->
+    gen_event:notify(?SERVER, {log_response, Response}).
 
 %%
 %% Local Functions

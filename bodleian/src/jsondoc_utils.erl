@@ -5,6 +5,8 @@
 
 -record(jsondoc, {'_id', '_ver', type, body}).
 -record(couchdb_response, {total_rows, offset, rows}).
+-record(manifestdoc, {id, key, value}).
+
 %%
 %% Include files
 %%
@@ -15,13 +17,19 @@
 -export([add_header/3,
          strip_header/1,
          get_docs_from_couchdb_response/1,
-         create_user_views/0]).
+         create_user_views/0,
+         process_manifest_list/2]).
 
 %%
 %% API Functions
 %%
 add_header(Id, Type, Body) ->
-    Doc = #jsondoc{'_id'=Id, type=Type, body=Body},
+    case Id of
+        [] ->
+            Doc = #jsondoc{type=Type, body=Body};
+        _ ->
+            Doc = #jsondoc{'_id'=Id, type=Type, body=Body}
+    end,
     rfc4627:from_record(Doc, jsondoc, record_info(fields, jsondoc)).
 
 strip_header(Doc) ->
@@ -34,10 +42,16 @@ get_docs_from_couchdb_response(Doc) ->
 %   {ok, DecodedBody, _Raw} = rfc4627:decode(Doc).
 
 create_user_views() ->
-    ManifestView = {obj, [{map, <<"function(doc) {\n  if(doc.type == \"manifest\")\n  emit(null, doc);\n}">>}]},
+    ManifestView = {obj, [{map, <<"function(doc) {\n  if(doc.type == \"manifest\")\n  emit(doc._id, null);\n}">>}]},
     Views = {obj, [{get_manifest_list, ManifestView}]},          
     rfc4627:encode({obj, [{language, <<"javascript">>},
                           {views, Views}]}).
+
+process_manifest_list([], ManifestList) ->
+    lists:reverse(ManifestList);
+process_manifest_list([Manifest|Tail], ManifestList) ->
+    ManifestRecord = rfc4627:to_record(Manifest, #manifestdoc{}, record_info(fields, manifestdoc)),
+    process_manifest_list(Tail, [ManifestRecord#manifestdoc.id|ManifestList]).
 
 %%
 %% Local Functions

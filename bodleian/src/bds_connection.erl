@@ -24,11 +24,11 @@
          delete_user/2,
          get_manifest_list/2,
          get_manifest/3,
-         put_manifest/3,
+         create_manifest/4,
          update_manifest/4,
          delete_manifest/3,
          get_file/3,
-         put_file/3,
+         create_file/3,
          update_file/4,
          delete_file/3]).
 
@@ -38,6 +38,7 @@
 -define(DEFAULT_TIMEOUT, 3000).
 -define(DEFAULT_PORT, 5984).
 -define(DEFAULT_HOST, "127.0.0.1").
+-define(MANIFEST_QUERY, "get_manifest_list").
 
 -record(state, {timeout, host, port}).
 
@@ -77,8 +78,8 @@ get_manifest_list(Pid, User) ->
 get_manifest(Pid, Id, User) ->
     gen_server:call(Pid, {get_manifest, {Id, User}}).
 
-put_manifest(Pid, ManifestData, User) ->
-    gen_server:cast(Pid, {put_manifest, {ManifestData, User}}).
+create_manifest(Pid, Id, ManifestData, User) ->
+    gen_server:call(Pid, {create_manifest, {Id, ManifestData, User}}).
 
 update_manifest(Pid, Id, ManifestData, User) ->
     gen_server:cast(Pid, {update_manifest, {Id, ManifestData, User}}).
@@ -89,8 +90,8 @@ delete_manifest(Pid, Id, User) ->
 get_file(Pid, Id, User) ->
     gen_server:call(Pid, {get_file, {Id, User}}).
 
-put_file(Pid, FileData, User) ->
-    gen_server:cast(Pid, {put_file, {FileData, User}}).
+create_file(Pid, FileData, User) ->
+    gen_server:cast(Pid, {create_file, {FileData, User}}).
 
 update_file(Pid, Id, FileData, User) ->
     gen_server:cast(Pid, {update_file, {Id, FileData, User}}).
@@ -126,45 +127,63 @@ init([Timeout, Host, Port]) ->
 handle_call({create_user, User}, _From, State) ->
     Url = create_url(State#state.host, State#state.port, User),
     bds_event:create_user(Url),
-    {ok, {{_Version, StatusCode, _Result}, _Headers, _Body}} =
-        httpc:request(put, {Url, [], "application/json", []}, [], []),
-    case StatusCode of
-        201 ->
+    {ok, Response} = httpc:request(put, {Url, [], "application/json", []}, [], []),
+    case handle_response(Response) of
+        ok ->
             ViewUrl = create_view_url(State#state.host, State#state.port, User),
-            {ok, {{_, ViewStatusCode, _}, _, _}} = 
+            {ok, ViewResponse} = 
                 httpc:request(put, {ViewUrl, [], "application/json", jsondoc_utils:create_user_views()}, [], []),
-            case ViewStatusCode of
-                201 -> 
+            case handle_response(ViewResponse) of
+                ok -> 
                     {reply, ok, State, State#state.timeout};
-                _ ->
-                    ErrorMsg = io_lib:format("Unknown error occurred creating views for new user: ~s", [Url]),
+                {error, Error} ->
+                    ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
                     {reply, {error, ErrorMsg}, State, State#state.timeout}
             end;
-        412 ->
-            ErrorMsg = io_lib:format("User already exists: ~s", [Url]),
-            {reply, {error, ErrorMsg}, State, State#state.timeout};
-        _ ->
-            ErrorMsg = io_lib:format("Unknown error occurred trying to create user: ~s", [Url]),
+        {error, Error} ->
+            ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
             {reply, {error, ErrorMsg}, State, State#state.timeout}
     end;
 handle_call({delete_user, User}, _From, State) ->
     Url = create_url(State#state.host, State#state.port, User),
     bds_event:delete_user(Url),
-    {ok, {{_Version, StatusCode, _Result}, _Headers, _Body}} = 
-        httpc:request(delete, {Url, []}, [], []),
-    case StatusCode of
-        200 -> 
+    {ok, Response} = httpc:request(delete, {Url, []}, [], []),
+    case handle_response(Response) of
+        ok -> 
             {reply, ok, State, State#state.timeout};
-        404 ->
-            ErrorMsg = io_lib:format("No such user exists: ~s", [Url]),
-            {reply, {error, ErrorMsg}, State, State#state.timeout};
-        _ ->
-            ErrorMsg = io_lib:format("Unknown error occurred trying to delete user: ~s", [Url]),
+        {error, Error} ->
+            ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
+            {reply, {error, ErrorMsg}, State, State#state.timeout}
+    end;
+handle_call({create_manifest, {Id, ManifestData, User}}, _From, State) ->
+    Url = create_url(State#state.host, State#state.port, User, Id),
+    bds_event:create_manifest(Id, Url),
+    JsonData = rfc4627:encode(ManifestData),
+    JsonDoc = rfc4627:encode(jsondoc_utils:add_header("", manifest, JsonData)),
+    Headers = ["Content-Type: application/json"],
+    {ok, Response} = httpc:request(put, {Url, Headers, "application/json", JsonDoc}, [], []),
+    case handle_response(Response) of
+        ok ->
+            {reply, ok, State, State#state.timeout};
+        {error, Error} ->
+            ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
+            bds_event:log_error(ErrorMsg),
             {reply, {error, ErrorMsg}, State, State#state.timeout}
     end;
 handle_call({get_manifest_list, User}, _From, State) ->
-    ManifestList = [],
-    {reply, {ok, ManifestList}, State, State#state.timeout};
+    Url = create_view_query_url(State#state.host, State#state.port, User, ?MANIFEST_QUERY),
+    {ok, {{_Version, _StatusCode, _Result}, _Headers, Body} = Response} = httpc:request(get, {Url, []}, [], []),
+    case handle_response(Response) of
+        ok ->
+            {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
+            ManifestList = 
+                jsondoc_utils:process_manifest_list(jsondoc_utils:get_docs_from_couchdb_response(DecodedBody),[]),
+            {reply, {ok, ManifestList}, State, State#state.timeout};
+        {error, Error} ->
+            ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
+            bds_event:log_error(ErrorMsg),
+            {reply, {error, ErrorMsg}, State, State#state.timeout}
+    end;
 handle_call({get_manifest, {Id, User}}, _From, State) ->
     {reply, ok, State, State#state.timeout};
 handle_call({get_file, {Id, User}}, _From, State) ->
@@ -179,13 +198,11 @@ handle_call({get_file, {Id, User}}, _From, State) ->
 %% --------------------------------------------------------------------
 handle_cast(delete, State) ->
     {stop, normal, State};
-handle_cast({put_manifest, {ManifestData, User}}, State) ->
-    {noreply, State, State#state.timeout};
 handle_cast({update_manifest, {Id, ManifestData, User}}, State) ->
     {noreply, State, State#state.timeout};
 handle_cast({delete_manifest, {Id, User}}, State) ->
     {noreply, State, State#state.timeout};
-handle_cast({put_file, {FileData, User}}, State) ->
+handle_cast({create_file, {FileData, User}}, State) ->
     {noreply, State, State#state.timeout};
 handle_cast({update_file, {Id, FileData, User}}, State) ->
     {noreply, State, State#state.timeout};
@@ -236,3 +253,34 @@ create_url(Host, Port, Database, Path) ->
 create_view_url(Host, Port, Database) ->
     lists:flatten(io_lib:format("http://~s:~w/~s/_design/bodleian", [Host, Port, Database])).
 
+create_view_query_url(Host, Port, Database, Query) ->
+    lists:flatten(io_lib:format("http://~s:~w/~s/_design/bodleian/_view/~s", [Host, Port, Database, Query])).
+
+handle_response({{Version, StatusCode, Result}, Headers, Body} ) ->
+    
+    bds_event:log_response([{version, Version}, {status, StatusCode}, 
+                            {result,Result}, {headers, Headers}, {body, Body}]),
+    case StatusCode of
+        200 -> 
+            ok;
+        201 ->
+            ok;
+        202 ->
+            ok;
+        304 ->
+            ok;
+        400 ->
+            {error, "Incorrect syntax or could not be processed"};
+        404 ->
+            {error, "No such document"};
+        405 ->
+            {error, "Incorrect method in request"};
+        409 ->
+            {error, "A file of the same name already exists"};
+        412 ->
+            {error, "A user of the same name already exists"};
+        500 ->
+            {error, "An error occurred in the database"};
+        _ ->
+            {error, "An unknown error occurred"}
+    end.

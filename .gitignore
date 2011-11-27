@@ -1,5 +1,6 @@
 *.beam
 *.swp
+*.wam
 logs/
 .settings/
 .directory

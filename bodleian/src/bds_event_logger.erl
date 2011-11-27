@@ -13,7 +13,8 @@
 
 %% --------------------------------------------------------------------
 %% External exports
--export([add_handler/0, 
+-export([add_handler/1,
+         add_handler/0, 
          delete_handler/0]).
 
 %% gen_event callbacks
@@ -24,13 +25,18 @@
          terminate/2, 
          code_change/3]).
 
--record(state, {}).
+-define(DEBUG, true).
+
+-record(state, {debug}).
 
 %% ====================================================================
 %% External functions
 %% ====================================================================
+add_handler(Debug) ->
+    bds_event:add_handler(?MODULE, [Debug]).
+
 add_handler() ->
-    bds_event:add_handler(?MODULE, []).
+    add_handler(?DEBUG).
 
 delete_handler() ->
     bds_event:delete_handler(?MODULE, []).
@@ -43,8 +49,8 @@ delete_handler() ->
 %% Returns: {ok, State}          |
 %%          Other
 %% --------------------------------------------------------------------
-init([]) ->
-    {ok, #state{}}.
+init([Debug]) ->
+    {ok, #state{debug=Debug}}.
 
 %% --------------------------------------------------------------------
 %% Func: handle_event/2
@@ -56,23 +62,31 @@ handle_event({create_user, User}, State) ->
     error_logger:info_msg("create_user[~s]~n", [User]),
     {ok, State};
 handle_event({delete_user, User}, State) ->
-    error_logger:info_msg("delete_user[~w]~n", [User]),
+    error_logger:info_msg("delete_user[~s]~n", [User]),
     {ok, State};
 handle_event({get_manifest, {Id, User}}, State) ->
-    error_logger:info_msg("get_manifest[~w, ~w]~n", [Id, User]),
+    error_logger:info_msg("get_manifest[~s, ~s]~n", [Id, User]),
     {ok, State};
-handle_event({put_manifest, {Id, User}}, State) ->
-    error_logger:info_msg("put_manifest[~w, ~w]~n", [Id, User]),
+handle_event({create_manifest, {Id, User}}, State) ->
+    error_logger:info_msg("create_manifest[~s, ~s]~n", [Id, User]),
     {ok, State};
 handle_event({get_file, {Id, User}}, State) ->
-    error_logger:info_msg("get_file[~w, ~w]~n", [Id, User]),
+    error_logger:info_msg("get_file[~s, ~s]~n", [Id, User]),
     {ok, State};
-handle_event({put_file, {Id, User}}, State) ->
-    error_logger:info_msg("put_file[~w, ~w]~n", [Id, User]),
+handle_event({create_file, {Id, User}}, State) ->
+    error_logger:info_msg("create_file[~s, ~s]~n", [Id, User]),
     {ok, State};
 handle_event({log_error, Error}, State) ->
     error_logger:error_msg("ERROR: ~s~n", [Error]),
     {ok, State};
+handle_event({log_response, Response}, State) ->
+    case State#state.debug of
+        true ->
+            error_logger:info_report(Response),
+            {ok, State};
+        false ->
+            {ok, State}
+    end;
 handle_event(_Event, State) ->
     {ok, State}.
 

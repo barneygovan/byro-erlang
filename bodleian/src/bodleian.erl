@@ -14,11 +14,11 @@
          delete_user/1,
          get_manifest_list/1,
          get_manifest/2,
-         put_manifest/2,
+         create_manifest/3,
          update_manifest/3,
          delete_manifest/2,
          get_file/2,
-         put_file/2,
+         create_file/2,
          update_file/3,
          delete_file/2]).
 
@@ -54,9 +54,9 @@ get_manifest(Id, User) ->
     bds_connection:delete(Pid),
     {ok, Manifest}.
 
-put_manifest(ManifestData, User) ->
+create_manifest(Id, ManifestData, User) ->
     {ok, Pid} = bds_connection:create(),
-    bds_connection:put_manifest(Pid, ManifestData, User),
+    bds_connection:create_manifest(Pid, Id, ManifestData, User),
     bds_connection:delete(Pid),
     ok.
 
@@ -78,9 +78,9 @@ get_file(Id, User) ->
     bds_connection:delete(Pid),
     {ok, File}.
 
-put_file(FileData, User) ->
+create_file(FileData, User) ->
     {ok, Pid} = bds_connection:create(),
-    bds_connection:put_file(Pid, FileData, User),
+    bds_connection:create_file(Pid, FileData, User),
     bds_connection:delete(Pid),
     ok.
 
