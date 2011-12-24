@@ -44,6 +44,9 @@
 %%          {error, Reason}
 %% --------------------------------------------------------------------
 start(_Type, _StartArgs) ->
+    %% TODO: start any services we need running
+    startup_required_services(),
+    %% TODO: make sure document store is available
     ok = locate_document_store(),
     case bds_sup:start_link() of
 	{ok, Pid} ->
@@ -67,4 +70,7 @@ locate_document_store() ->
     ensure_document_store_version().
 
 ensure_document_store_version() ->
+    ok.
+
+startup_required_services() ->
     ok.

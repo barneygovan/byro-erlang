@@ -1,6 +1,7 @@
 *.beam
 *.swp
 *.wam
+erl_crash.dump
 logs/
 .settings/
 .directory

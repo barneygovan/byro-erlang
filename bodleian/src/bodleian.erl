@@ -29,36 +29,31 @@ create_user(User) ->
     {ok, Pid} = bds_connection:create(),
     Result = bds_connection:create_user(Pid, User),
     bds_connection:delete(Pid),
-    case Result of
-        ok -> ok;
-        {error, Reason} ->
-            bds_event:log_error(Reason),
-            error
-    end.
+    Result.
 
 delete_user(User) ->
     {ok, Pid} = bds_connection:create(),
-    ok = bds_connection:delete_user(Pid, User),
+    Result = bds_connection:delete_user(Pid, User),
     bds_connection:delete(Pid),
-    ok.
+    Result.
 
 get_manifest_list(User) ->
     {ok, Pid} = bds_connection:create(),
-    {ok, ManifestList} = bds_connection:get_manifest_list(Pid, User),
+    Result = bds_connection:get_manifest_list(Pid, User),
     bds_connection:delete(Pid),
-    {ok, ManifestList}.
+    Result.
 
 get_manifest(Id, User) ->
     {ok, Pid} = bds_connection:create(),
-    {ok, Manifest} = bds_connection:get_manifest(Pid, Id, User),
+    Result = bds_connection:get_manifest(Pid, Id, User),
     bds_connection:delete(Pid),
-    {ok, Manifest}.
+    Result.
 
 create_manifest(Id, ManifestData, User) ->
     {ok, Pid} = bds_connection:create(),
-    bds_connection:create_manifest(Pid, Id, ManifestData, User),
+    Result = bds_connection:create_manifest(Pid, Id, ManifestData, User),
     bds_connection:delete(Pid),
-    ok.
+    Result.
 
 update_manifest(Id, ManifestData, User) ->
     {ok, Pid} = bds_connection:create(),
@@ -74,15 +69,15 @@ delete_manifest(Id, User) ->
 
 get_file(Id, User) ->
     {ok, Pid} = bds_connection:create(),
-    {ok, File} = bds_connection:get_file(Pid, Id, User),
+    Result = bds_connection:get_file(Pid, Id, User),
     bds_connection:delete(Pid),
-    {ok, File}.
+    Result.
 
 create_file(FileData, User) ->
     {ok, Pid} = bds_connection:create(),
-    bds_connection:create_file(Pid, FileData, User),
+    Result = bds_connection:create_file(Pid, FileData, User),
     bds_connection:delete(Pid),
-    ok.
+    Result.
 
 update_file(Id, FileData, User) ->
     {ok, Pid} = bds_connection:create(),

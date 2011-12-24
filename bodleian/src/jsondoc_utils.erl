@@ -6,6 +6,7 @@
 -record(jsondoc, {'_id', '_ver', type, body}).
 -record(couchdb_response, {total_rows, offset, rows}).
 -record(manifestdoc, {id, key, value}).
+-record(create_response, {ok, id, rev}).
 
 %%
 %% Include files
@@ -18,7 +19,8 @@
          strip_header/1,
          get_docs_from_couchdb_response/1,
          create_user_views/0,
-         process_manifest_list/2]).
+         process_manifest_list/2,
+         get_file_id/1]).
 
 %%
 %% API Functions
@@ -52,6 +54,10 @@ process_manifest_list([], ManifestList) ->
 process_manifest_list([Manifest|Tail], ManifestList) ->
     ManifestRecord = rfc4627:to_record(Manifest, #manifestdoc{}, record_info(fields, manifestdoc)),
     process_manifest_list(Tail, [ManifestRecord#manifestdoc.id|ManifestList]).
+
+get_file_id(FileResponse) ->
+    ResponseRecord = rfc4627:to_record(FileResponse, #create_response{}, record_info(fields, create_response)),
+    ResponseRecord#create_response.id.
 
 %%
 %% Local Functions

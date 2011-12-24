@@ -91,7 +91,7 @@ get_file(Pid, Id, User) ->
     gen_server:call(Pid, {get_file, {Id, User}}).
 
 create_file(Pid, FileData, User) ->
-    gen_server:cast(Pid, {create_file, {FileData, User}}).
+    gen_server:call(Pid, {create_file, {FileData, User}}).
 
 update_file(Pid, Id, FileData, User) ->
     gen_server:cast(Pid, {update_file, {Id, FileData, User}}).
@@ -170,9 +170,26 @@ handle_call({create_manifest, {Id, ManifestData, User}}, _From, State) ->
             bds_event:log_error(ErrorMsg),
             {reply, {error, ErrorMsg}, State, State#state.timeout}
     end;
+handle_call({create_file, {FileData, User}}, _From, State) ->
+    Url = create_url(State#state.host, State#state.port, User),
+    JsonData = rfc4627:encode(FileData),
+    JsonDoc = rfc4627:encode(jsondoc_utils:add_header("", file, JsonData)),
+    Headers = ["Content-Type: application/json"],
+    {ok, {_Result, _Headers, Body} = Response} = httpc:request(post, {Url, Headers, "application/json", JsonDoc}, [], []),
+    case handle_response(Response) of
+        ok ->
+            {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
+            Id = jsondoc_utils:get_file_id(DecodedBody),
+            bds_event:create_file(Id, Url),
+            {reply, {ok, Id}, State, State#state.timeout};
+        {error, Error} ->
+            ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
+            bds_event:log_error(ErrorMsg),
+            {reply, {error, ErrorMsg}, State, State#state.timeout}
+    end;
 handle_call({get_manifest_list, User}, _From, State) ->
     Url = create_view_query_url(State#state.host, State#state.port, User, ?MANIFEST_QUERY),
-    {ok, {{_Version, _StatusCode, _Result}, _Headers, Body} = Response} = httpc:request(get, {Url, []}, [], []),
+    {ok, {_Result, _Headers, Body} = Response} = httpc:request(get, {Url, []}, [], []),
     case handle_response(Response) of
         ok ->
             {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
@@ -185,9 +202,34 @@ handle_call({get_manifest_list, User}, _From, State) ->
             {reply, {error, ErrorMsg}, State, State#state.timeout}
     end;
 handle_call({get_manifest, {Id, User}}, _From, State) ->
-    {reply, ok, State, State#state.timeout};
+    Url = create_url(State#state.host, State#state.port, User, Id),
+    bds_event:get_manifest(Id, Url),
+    {ok, {_Result, _Headers, Body} = Response} = httpc:request(get, {Url, []}, [], []),
+    case handle_response(Response) of
+        ok ->
+            {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
+            Manifest = jsondoc_utils:strip_header(DecodedBody),
+            {reply, {ok, Manifest}, State, State#state.timeout};
+        {error, Error} ->
+            ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
+            bds_event:log_error(ErrorMsg),
+            {reply, {error, ErrorMsg}, State, State#state.timeout}
+    end;
+%% TODO: get_file code is the same as get_manifest, with only the event handling as a difference
 handle_call({get_file, {Id, User}}, _From, State) ->
-    {reply, ok, State, State#state.timeout}.
+    Url = create_url(State#state.host, State#state.port, User, Id),
+    bds_event:get_file(Id, Url),
+    {ok, {_Result, _Headers, Body} = Response} = httpc:request(get, {Url, []}, [], []),
+    case handle_response(Response) of
+        ok ->
+            {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
+            File = jsondoc_utils:strip_header(DecodedBody),
+            {reply, {ok, File}, State, State#state.timeout};
+        {error, Error} ->
+            ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
+            bds_event:log_error(ErrorMsg),
+            {reply, {error, ErrorMsg}, State, State#state.timeout}
+    end.
 
 %% --------------------------------------------------------------------
 %% Function: handle_cast/2
@@ -201,8 +243,6 @@ handle_cast(delete, State) ->
 handle_cast({update_manifest, {Id, ManifestData, User}}, State) ->
     {noreply, State, State#state.timeout};
 handle_cast({delete_manifest, {Id, User}}, State) ->
-    {noreply, State, State#state.timeout};
-handle_cast({create_file, {FileData, User}}, State) ->
     {noreply, State, State#state.timeout};
 handle_cast({update_file, {Id, FileData, User}}, State) ->
     {noreply, State, State#state.timeout};
