@@ -73,4 +73,4 @@ ensure_document_store_version() ->
     ok.
 
 startup_required_services() ->
-    ok.
+    inets:start().
