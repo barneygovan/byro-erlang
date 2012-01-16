@@ -24,6 +24,7 @@
 %% --------------------------------------------------------------------
 %% Macros
 %% --------------------------------------------------------------------
+-define(DEFAULT_INI_FILE, "bds.ini").
 
 %% --------------------------------------------------------------------
 %% Records
@@ -44,8 +45,10 @@
 %%          {error, Reason}
 %% --------------------------------------------------------------------
 start(_Type, _StartArgs) ->
+	%% Load configuration
+	load_configuration(),
     %% TODO: start any services we need running
-    startup_required_services(),
+    ok = startup_required_services([inets]),
     %% TODO: make sure document store is available
     ok = locate_document_store(),
     case bds_sup:start_link() of
@@ -66,11 +69,28 @@ stop(_State) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
+load_configuration() ->
+	case init:get_argument(bds_ini) of
+		{ok, [[IniFilename]]} ->
+			bodleian_config:read_config_file(IniFilename);
+		_Any ->
+			bodleian_config:read_config_file(?DEFAULT_INI_FILE)
+	end.
+	
 locate_document_store() ->
     ensure_document_store_version().
 
 ensure_document_store_version() ->
     ok.
 
-startup_required_services() ->
-    inets:start().
+startup_required_services([]) ->
+	ok;
+startup_required_services([Service|Rest]) ->
+    case application:start(Service) of 
+		ok ->
+			startup_required_services(Rest);
+		{error, {already_started, Service}} ->
+			startup_required_services(Rest);
+		{error, _Reason} ->
+			{error, {cant_start, Service}}
+	end.

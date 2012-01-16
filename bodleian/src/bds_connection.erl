@@ -127,12 +127,12 @@ init([Timeout, Host, Port]) ->
 handle_call({create_user, User}, _From, State) ->
     Url = create_url(State#state.host, State#state.port, User),
     bds_event:create_user(Url),
-    {ok, Response} = httpc:request(put, {Url, [], "application/json", []}, [], []),
+    {ok, Response} = http:request(put, {Url, [], "application/json", []}, [], []),
     case handle_response(Response) of
         ok ->
             ViewUrl = create_view_url(State#state.host, State#state.port, User),
             {ok, ViewResponse} = 
-                httpc:request(put, {ViewUrl, [], "application/json", jsondoc_utils:create_user_views()}, [], []),
+                http:request(put, {ViewUrl, [], "application/json", jsondoc_utils:create_user_views()}, [], []),
             case handle_response(ViewResponse) of
                 ok -> 
                     {reply, ok, State, State#state.timeout};
@@ -147,7 +147,7 @@ handle_call({create_user, User}, _From, State) ->
 handle_call({delete_user, User}, _From, State) ->
     Url = create_url(State#state.host, State#state.port, User),
     bds_event:delete_user(Url),
-    {ok, Response} = httpc:request(delete, {Url, []}, [], []),
+    {ok, Response} = http:request(delete, {Url, []}, [], []),
     case handle_response(Response) of
         ok -> 
             {reply, ok, State, State#state.timeout};
@@ -161,7 +161,7 @@ handle_call({create_manifest, {Id, ManifestData, User}}, _From, State) ->
     JsonData = rfc4627:encode(ManifestData),
     JsonDoc = rfc4627:encode(jsondoc_utils:add_header("", manifest, JsonData)),
     Headers = ["Content-Type: application/json"],
-    {ok, Response} = httpc:request(put, {Url, Headers, "application/json", JsonDoc}, [], []),
+    {ok, Response} = http:request(put, {Url, Headers, "application/json", JsonDoc}, [], []),
     case handle_response(Response) of
         ok ->
             {reply, ok, State, State#state.timeout};
@@ -175,7 +175,7 @@ handle_call({create_file, {FileData, User}}, _From, State) ->
     JsonData = rfc4627:encode(FileData),
     JsonDoc = rfc4627:encode(jsondoc_utils:add_header("", file, JsonData)),
     Headers = ["Content-Type: application/json"],
-    {ok, {_Result, _Headers, Body} = Response} = httpc:request(post, {Url, Headers, "application/json", JsonDoc}, [], []),
+    {ok, {_Result, _Headers, Body} = Response} = http:request(post, {Url, Headers, "application/json", JsonDoc}, [], []),
     case handle_response(Response) of
         ok ->
             {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
@@ -189,7 +189,7 @@ handle_call({create_file, {FileData, User}}, _From, State) ->
     end;
 handle_call({get_manifest_list, User}, _From, State) ->
     Url = create_view_query_url(State#state.host, State#state.port, User, ?MANIFEST_QUERY),
-    {ok, {_Result, _Headers, Body} = Response} = httpc:request(get, {Url, []}, [], []),
+    {ok, {_Result, _Headers, Body} = Response} = http:request(get, {Url, []}, [], []),
     case handle_response(Response) of
         ok ->
             {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
@@ -204,7 +204,7 @@ handle_call({get_manifest_list, User}, _From, State) ->
 handle_call({get_manifest, {Id, User}}, _From, State) ->
     Url = create_url(State#state.host, State#state.port, User, Id),
     bds_event:get_manifest(Id, Url),
-    {ok, {_Result, _Headers, Body} = Response} = httpc:request(get, {Url, []}, [], []),
+    {ok, {_Result, _Headers, Body} = Response} = http:request(get, {Url, []}, [], []),
     case handle_response(Response) of
         ok ->
             {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
@@ -219,7 +219,7 @@ handle_call({get_manifest, {Id, User}}, _From, State) ->
 handle_call({get_file, {Id, User}}, _From, State) ->
     Url = create_url(State#state.host, State#state.port, User, Id),
     bds_event:get_file(Id, Url),
-    {ok, {_Result, _Headers, Body} = Response} = httpc:request(get, {Url, []}, [], []),
+    {ok, {_Result, _Headers, Body} = Response} = http:request(get, {Url, []}, [], []),
     case handle_response(Response) of
         ok ->
             {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
