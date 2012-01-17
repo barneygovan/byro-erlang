@@ -46,18 +46,25 @@
 %% --------------------------------------------------------------------
 start(_Type, _StartArgs) ->
 	%% Load configuration
-	load_configuration(),
-    %% TODO: start any services we need running
-    ok = startup_required_services([inets]),
-    %% TODO: make sure document store is available
-    ok = locate_document_store(),
-    case bds_sup:start_link() of
-	{ok, Pid} ->
-        bds_event_logger:add_handler(),
-	    {ok, Pid};
-	Error ->
-	    Error
+	case load_configuration() of
+        file_not_found ->
+            io:format("No ini file found.~n"),
+            {error, "No ini file found."};
+        ok ->
+            %% TODO: start any services we need running
+            ok = startup_required_services([inets]),
+            %% TODO: make sure document store is available
+            ok = locate_document_store(),
+            case bds_sup:start_link() of
+            {ok, Pid} ->
+                %% Initialize logger
+                bds_event_logger:add_handler(),
+                {ok, Pid};
+            Error ->
+                Error
+            end
     end.
+    
 
 %% --------------------------------------------------------------------
 %% Func: stop/1
@@ -72,9 +79,9 @@ stop(_State) ->
 load_configuration() ->
 	case init:get_argument(bds_ini) of
 		{ok, [[IniFilename]]} ->
-			bodleian_config:read_config_file(IniFilename);
+			bodleian_config:read_config_file(IniFilename, filename);
 		_Any ->
-			bodleian_config:read_config_file(?DEFAULT_INI_FILE)
+			bodleian_config:read_config_file(?DEFAULT_INI_FILE, filename)
 	end.
 	
 locate_document_store() ->

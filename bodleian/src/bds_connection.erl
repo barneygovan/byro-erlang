@@ -46,19 +46,54 @@
 %% External functions
 %% ====================================================================
 start_link() ->
-    start_link(?DEFAULT_HOST, ?DEFAULT_PORT, ?DEFAULT_TIMEOUT).
+    Timeout = 
+        case bodleian_config:get("couchdb", "timeout") of
+            none ->
+                ?DEFAULT_TIMEOUT;
+            AnyTimeout ->
+                AnyTimeout
+        end,
+    start_link(Timeout).
 
 start_link(Timeout) ->
-    start_link(?DEFAULT_HOST, ?DEFAULT_PORT, Timeout).
+    Host = 
+        case bodleian_config:get("couchdb", "host") of
+            none ->
+                ?DEFAULT_HOST;
+            AnyHost ->
+                AnyHost
+        end,
+    Port = 
+        case bodleian_config:get("couchdb", "port") of
+            none ->
+                ?DEFAULT_PORT;
+            AnyPort ->
+                AnyPort
+        end,
+    start_link(Host, Port, Timeout).
 
 start_link(Host, Port) ->
-    start_link(Host, Port, ?DEFAULT_TIMEOUT).
+    Timeout = 
+        case bodleian_config:get("couchdb", "timeout") of
+            none ->
+                ?DEFAULT_TIMEOUT;
+            AnyTimeout ->
+                AnyTimeout
+        end,
+    start_link(Host, Port, Timeout).
 
 start_link(Host, Port, Timeout) ->
     gen_server:start_link(?MODULE, [Timeout, Host, Port], []).
 
 create() ->
-    create(?DEFAULT_TIMEOUT).
+    Timeout = 
+        case bodleian_config:get("couchdb", "timeout") of
+            none ->
+                ?DEFAULT_TIMEOUT;
+            AnyTimeout ->
+                AnyTimeout
+        end,
+    create(Timeout).
 
 create(Timeout) ->
     bds_connection_sup:start_child(Timeout).

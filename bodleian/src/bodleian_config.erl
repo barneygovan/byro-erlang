@@ -11,51 +11,76 @@
 %% Exported Functions
 %%
 -export([read_config_file/2,
-		 get/2]).
+         read_config_file/3,
+		 get/2,
+         get/3]).
 
+%%
+%% Macros
+%%
+-define(TABLE_NAME, ?MODULE).
 
 %%
 %% API Functions
 %%
-read_config_file(Filename, filename) ->
-	{ok, File} = file:open(Filename, read),
-	read_config_file(File, file);
-read_config_file(File, file) ->
-	ets:new(?MODULE, [named_table, set, protected]),
-	read_line(File, none).
+read_config_file(Filename, filename, TableName) ->
+    case file:read_file(Filename) of 
+        {ok, FileContents} ->
+            read_config_file(binary_to_list(FileContents), text, TableName);
+        {error, enoent} ->
+            file_not_found
+    end;
+read_config_file(Text, text, TableName) ->
+    case Text of 
+        "" ->
+            {error, empty_file};
+        _ ->
+            Lines = string:tokens(Text, "\r\n"),
+	        ets:new(TableName, [named_table, set, protected]),
+            read_line(Lines, none, TableName)
+    end.
 
-get(SectionName, Key) ->
-	case ets:lookup(?MODULE, {SectionName, Key}) of
+read_config_file(Filename, filename) ->
+    read_config_file(Filename, filename, ?TABLE_NAME);
+read_config_file(Lines, lines) ->
+    read_config_file(Lines, lines, ?TABLE_NAME).
+
+get(SectionName, Key, TableName) ->
+	case ets:lookup(TableName, {SectionName, Key}) of
 		[] ->
 			none;
 		[{_,Value}] ->
 			Value
 	end.
 
+get(SectionName, Key) ->
+    get(SectionName, Key, ?TABLE_NAME).
+
 %%
 %% Local Functions
 %%
-read_line(File, CurrentSection) ->
-	case io:get_line(File) of 
-		eof ->
-			file:close(File);
-		Line ->
-			case process_line(Line) of
-				comment -> 
-					read_line(File, CurrentSection);
-				{section, SectionName} ->
-					read_line(File, SectionName);
-				{ok, Key, Value} ->
-					ets:insert({CurrentSection, Key}, Value),
-					read_line(File, CurrentSection);
-				bad_config_line ->
-					bds_event:log_error("Badly formatted config line: " ++ Line),
-					read_line(File, CurrentSection)
-			end
-	end.
+read_line([], _CurrentSection, _TableName) ->
+    ok;
+read_line([Line|Lines], CurrentSection, TableName) ->
+    case process_line(Line) of
+        comment ->
+            read_line(Lines, CurrentSection, TableName);
+        empty ->
+            read_line(Lines, CurrentSection, TableName);
+        {section, SectionName} ->
+            read_line(Lines, SectionName, TableName);
+        {ok, Key, Value} ->
+            ets:insert(TableName, {{CurrentSection, Key}, Value}),
+            read_line(Lines, CurrentSection, TableName);
+        bad_config_line ->
+            bds_event:log_error("Badly formatted config line: " ++ Line),
+            read_line(Lines, CurrentSection, TableName)
+    end.
 
 process_line(Line) ->
 	case string:strip(Line) of 
+        "" ->
+            empty;
 		%% Handle the new category
 		"[" ++ Rest ->
 			[NewSectionName|_Other] = string:tokens(Rest, "]"),
