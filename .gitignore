@@ -5,5 +5,4 @@ erl_crash.dump
 logs/
 .settings/
 .directory
-mochiweb/
 jsonerl/
