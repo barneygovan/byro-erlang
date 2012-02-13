@@ -30,13 +30,14 @@
          get_file/3,
          create_file/3,
          update_file/4,
-         delete_file/3]).
+         delete_file/3,
+         get_version/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 -define(DEFAULT_TIMEOUT, 3000).
--define(DEFAULT_PORT, 5984).
+-define(DEFAULT_PORT, "5984").
 -define(DEFAULT_HOST, "127.0.0.1").
 -define(MANIFEST_QUERY, "get_manifest_list").
 
@@ -133,6 +134,34 @@ update_file(Pid, Id, FileData, User) ->
 
 delete_file(Pid, Id, User) ->
     gen_server:cast(Pid, {delete_file, {Id, User}}).
+
+get_version() ->
+    Port = 
+        case bodleian_config:get("couchdb", "port") of
+            none ->
+                ?DEFAULT_PORT;
+            AnyPort ->
+                AnyPort
+        end,
+    Host = 
+        case bodleian_config:get("couchdb", "host") of
+            none ->
+                ?DEFAULT_HOST;
+            AnyHost ->
+                AnyHost
+        end,
+    Url = lists:flatten(io_lib:format("http://~s:~s", [Host, Port])),
+    {ok, {_Result, _Headers, Body} = Response} = http:request(get, {Url, []}, [], []),
+    case handle_response(Response, noreport) of
+        ok ->
+            {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
+            jsondoc_utils:get_version(DecodedBody);
+        {error, Error} ->
+            ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
+            bds_event:log_error(ErrorMsg),
+            {error, ErrorMsg}
+    end.
+        
 
 %% ====================================================================
 %% Server functions
@@ -320,21 +349,23 @@ create_url(Host, Port, Database) ->
 create_url(Host, Port, Database, Path) ->
     case Path of
         [] ->
-            lists:flatten(io_lib:format("http://~s:~w/~s", [Host, Port, Database]));
+            lists:flatten(io_lib:format("http://~s:~s/~s", [Host, Port, Database]));
         _ ->
-            lists:flatten(io_lib:format("http://~s:~w/~s/~s", [Host, Port, Database, Path]))
+            lists:flatten(io_lib:format("http://~s:~s/~s/~s", [Host, Port, Database, Path]))
     end.
 
 create_view_url(Host, Port, Database) ->
-    lists:flatten(io_lib:format("http://~s:~w/~s/_design/bodleian", [Host, Port, Database])).
+    lists:flatten(io_lib:format("http://~s:~s/~s/_design/bodleian", [Host, Port, Database])).
 
 create_view_query_url(Host, Port, Database, Query) ->
-    lists:flatten(io_lib:format("http://~s:~w/~s/_design/bodleian/_view/~s", [Host, Port, Database, Query])).
+    lists:flatten(io_lib:format("http://~s:~s/~s/_design/bodleian/_view/~s", [Host, Port, Database, Query])).
 
-handle_response({{Version, StatusCode, Result}, Headers, Body} ) ->
-    
+handle_response({{Version, StatusCode, Result}, Headers, Body} = Args ) ->
     bds_event:log_response([{version, Version}, {status, StatusCode}, 
                             {result,Result}, {headers, Headers}, {body, Body}]),
+    handle_response(Args, noreport).
+
+handle_response({{_Version, StatusCode, _Result}, _Headers, _Body}, noreport) ->
     case StatusCode of
         200 -> 
             ok;

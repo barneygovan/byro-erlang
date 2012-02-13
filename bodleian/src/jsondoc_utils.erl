@@ -7,6 +7,7 @@
 -record(couchdb_response, {total_rows, offset, rows}).
 -record(manifestdoc, {id, key, value}).
 -record(create_response, {ok, id, rev}).
+-record(versiondoc, {couchdb, version}).
 
 %%
 %% Include files
@@ -17,6 +18,7 @@
 %%
 -export([add_header/3,
          strip_header/1,
+         get_version/1,
          get_docs_from_couchdb_response/1,
          create_user_views/0,
          process_manifest_list/2,
@@ -38,6 +40,10 @@ strip_header(Doc) ->
     JsonRecord = rfc4627:to_record(Doc, #jsondoc{}, record_info(fields, jsondoc)),
     JsonRecord#jsondoc.body.
 
+get_version(Doc) ->
+    JsonRecord = rfc4627:to_record(Doc, #versiondoc{}, record_info(fields, versiondoc)),
+    JsonRecord#versiondoc.version.
+
 get_docs_from_couchdb_response(Doc) ->
     CouchDbResponse = rfc4627:to_record(Doc, #couchdb_response{}, record_info(fields, couchdb_response)),
     CouchDbResponse#couchdb_response.rows.
@@ -58,6 +64,8 @@ process_manifest_list([Manifest|Tail], ManifestList) ->
 get_file_id(FileResponse) ->
     ResponseRecord = rfc4627:to_record(FileResponse, #create_response{}, record_info(fields, create_response)),
     ResponseRecord#create_response.id.
+
+
 
 %%
 %% Local Functions
