@@ -42,8 +42,8 @@ read_config_file(Text, text, TableName) ->
 
 read_config_file(Filename, filename) ->
     read_config_file(Filename, filename, ?TABLE_NAME);
-read_config_file(Lines, lines) ->
-    read_config_file(Lines, lines, ?TABLE_NAME).
+read_config_file(Text, text) ->
+    read_config_file(Text, text, ?TABLE_NAME).
 
 get(SectionName, Key, TableName) ->
 	case ets:lookup(TableName, {SectionName, Key}) of

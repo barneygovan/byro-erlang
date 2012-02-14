@@ -329,7 +329,7 @@ create_view_url(Host, Port, Database) ->
     lists:flatten(io_lib:format("http://~s:~w/~s/_design/bodleian", [Host, Port, Database])).
 
 create_view_query_url(Host, Port, Database, Query) ->
-    lists:flatten(io_lib:format("http://~s:~w/~s/_design/bodleian/_view/~s", [Host, Port, Database, Query])).
+    lists:flatten(io_lib:format("http://~s:~s/~s/_design/bodleian/_view/~s", [Host, Port, Database, Query])).
 
 handle_response({{Version, StatusCode, Result}, Headers, Body} ) ->
     
