@@ -25,6 +25,7 @@
 %% Macros
 %% --------------------------------------------------------------------
 -define(DEFAULT_INI_FILE, "bds.ini").
+-define(MIN_DOC_STORE_VERSION, "1.0.1").
 
 %% --------------------------------------------------------------------
 %% Records
@@ -88,6 +89,8 @@ locate_document_store() ->
     ensure_document_store_version().
 
 ensure_document_store_version() ->
+    Version = bds_connection:get_version(),
+    io:format("Found couchdb version ~s~n", [Version]),
     ok.
 
 startup_required_services([]) ->
