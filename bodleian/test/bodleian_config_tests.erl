@@ -27,7 +27,7 @@ read_config_file_simple_test() ->
 read_config_file_empty_test() ->
     TableName = read_config_file_empty_test,
     Text = "",
-    ?assertEqual(ok, bodleian_config:read_config_file(Text, text, TableName)).
+    ?assertEqual({error, empty_file}, bodleian_config:read_config_file(Text, text, TableName)).
 
 read_config_file_with_comments_test() ->
     TableName = read_config_file_with_comments_test,
