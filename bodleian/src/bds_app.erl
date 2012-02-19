@@ -25,7 +25,7 @@
 %% Macros
 %% --------------------------------------------------------------------
 -define(DEFAULT_INI_FILE, "bds.ini").
--define(MIN_DOC_STORE_VERSION, "1.0.1").
+-define(MIN_DOC_STORE_VERSION, "1.0.0").
 
 %% --------------------------------------------------------------------
 %% Records
@@ -52,18 +52,20 @@ start(_Type, _StartArgs) ->
             io:format("No ini file found.~n"),
             {error, "No ini file found."};
         ok ->
-            %% TODO: start any services we need running
             ok = startup_required_services([inets]),
-            %% TODO: make sure document store is available
-            ok = locate_document_store(),
-            case bds_sup:start_link() of
-            {ok, Pid} ->
-                %% Initialize logger
-                bds_event_logger:add_handler(),
-                {ok, Pid};
-            Error ->
-                Error
-            end
+            case ensure_document_store_version() of
+				ok ->
+		            case bds_sup:start_link() of
+		            {ok, Pid} ->
+		                %% Initialize logger
+		                bds_event_logger:add_handler(),
+		                {ok, Pid};
+		            Error ->
+		                Error
+		            end;
+				Error ->
+					Error
+			end
     end.
     
 
@@ -84,14 +86,24 @@ load_configuration() ->
 		_Any ->
 			bodleian_config:read_config_file(?DEFAULT_INI_FILE, filename)
 	end.
-	
-locate_document_store() ->
-    ensure_document_store_version().
 
 ensure_document_store_version() ->
-    Version = bds_connection:get_version(),
-    io:format("Found couchdb version ~s~n", [Version]),
-    ok.
+    case bds_connection:get_version() of 
+		{ok, Version} ->
+			case bodleian_utils:compare_versions(?MIN_DOC_STORE_VERSION, 
+												 binary_to_list(Version), 
+												 minimum) of
+				false ->
+					io:format("Cannot use couchdb version ~s, need minimum of version ~s~n", [Version, ?MIN_DOC_STORE_VERSION]),
+					{error, incorrect_couchdb_version};
+				true ->
+				    io:format("Found couchdb version ~s~n", [Version]),
+					ok
+			end;
+		{error, Error} ->
+			io:format("Error connecting to couchdb: ~s~n", [Error]),
+			{error, couchdb_connection_error}
+	end.
 
 startup_required_services([]) ->
 	ok;

@@ -155,7 +155,7 @@ get_version() ->
     case handle_response(Response, noreport) of
         ok ->
             {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
-            jsondoc_utils:get_version(DecodedBody);
+            {ok, jsondoc_utils:get_version(DecodedBody)};
         {error, Error} ->
             ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
             bds_event:log_error(ErrorMsg),
