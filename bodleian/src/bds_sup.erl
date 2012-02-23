@@ -53,7 +53,9 @@ init([]) ->
                             permanent, 2000, supervisor, [bds_connection]},
     EventManager = {bds_event, {bds_event, start_link, []},
                     permanent, 2000, worker, [bds_event]},
-    Children = [ConnectionSupervisor, EventManager],
+	RestApi = {bds_rest, {bds_rest, start_link, [[],[]]},
+			   permanent, 2000, worker, [bds_rest]},
+    Children = [ConnectionSupervisor, EventManager, RestApi],
     RestartStrategy = {one_for_one, 4, 3600},
     {ok, {RestartStrategy, Children}}.
 

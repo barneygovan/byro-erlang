@@ -49,13 +49,17 @@ get_manifest(Id, User) ->
     bds_connection:delete(Pid),
     Result.
 
-create_manifest(Id, ManifestData, User) ->
+create_manifest(Id, ManifestData, User) when is_list(ManifestData) ->
+	create_manifest(Id, list_to_binary(ManifestData), User);
+create_manifest(Id, ManifestData, User) when is_binary(ManifestData) ->
     {ok, Pid} = bds_connection:create(),
     Result = bds_connection:create_manifest(Pid, Id, ManifestData, User),
     bds_connection:delete(Pid),
     Result.
 
-update_manifest(Id, ManifestData, User) ->
+update_manifest(Id, ManifestData, User) when is_list(ManifestData) ->
+	update_manifest(Id, list_to_binary(ManifestData), User);
+update_manifest(Id, ManifestData, User) when is_binary(ManifestData) ->
     {ok, Pid} = bds_connection:create(),
     bds_connection:update_manifest(Pid, Id, ManifestData, User),
     bds_connection:delete(Pid),

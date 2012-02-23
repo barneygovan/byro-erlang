@@ -153,10 +153,10 @@ get_version() ->
     Url = lists:flatten(io_lib:format("http://~s:~s", [Host, Port])),
     {ok, {_Result, _Headers, Body} = Response} = http:request(get, {Url, []}, [], []),
     case handle_response(Response, noreport) of
-        ok ->
+        {ok, _Code} ->
             {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
             {ok, jsondoc_utils:get_version(DecodedBody)};
-        {error, Error} ->
+        {error, _Code, Error} ->
             ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
             bds_event:log_error(ErrorMsg),
             {error, ErrorMsg}
@@ -193,91 +193,87 @@ handle_call({create_user, User}, _From, State) ->
     bds_event:create_user(Url),
     {ok, Response} = http:request(put, {Url, [], "application/json", []}, [], []),
     case handle_response(Response) of
-        ok ->
+        {ok, Code} ->
             ViewUrl = create_view_url(State#state.host, State#state.port, User),
             {ok, ViewResponse} = 
                 http:request(put, {ViewUrl, [], "application/json", jsondoc_utils:create_user_views()}, [], []),
             case handle_response(ViewResponse) of
-                ok -> 
-                    {reply, ok, State, State#state.timeout};
-                {error, Error} ->
+                {ok, Code} -> 
+                    {reply, {ok, Code}, State, State#state.timeout};
+                {error, Code, Error} ->
                     ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
-                    {reply, {error, ErrorMsg}, State, State#state.timeout}
+                    {reply, {error, Code, ErrorMsg}, State, State#state.timeout}
             end;
-        {error, Error} ->
+        {error, Code, Error} ->
             ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
-            {reply, {error, ErrorMsg}, State, State#state.timeout}
+            {reply, {error, Code, ErrorMsg}, State, State#state.timeout}
     end;
 handle_call({delete_user, User}, _From, State) ->
     Url = create_url(State#state.host, State#state.port, User),
     bds_event:delete_user(Url),
     {ok, Response} = http:request(delete, {Url, []}, [], []),
     case handle_response(Response) of
-        ok -> 
-            {reply, ok, State, State#state.timeout};
-        {error, Error} ->
+        {ok, Code} -> 
+            {reply, {ok, Code}, State, State#state.timeout};
+        {error, Code, Error} ->
             ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
-            {reply, {error, ErrorMsg}, State, State#state.timeout}
+            {reply, {error, Code, ErrorMsg}, State, State#state.timeout}
     end;
 handle_call({create_manifest, {Id, ManifestData, User}}, _From, State) ->
     Url = create_url(State#state.host, State#state.port, User, Id),
     bds_event:create_manifest(Id, Url),
-    JsonData = rfc4627:encode(ManifestData),
-    JsonDoc = rfc4627:encode(jsondoc_utils:add_header("", manifest, JsonData)),
-    Headers = ["Content-Type: application/json"],
-    {ok, Response} = http:request(put, {Url, Headers, "application/json", JsonDoc}, [], []),
+    JsonDoc = rfc4627:encode(jsondoc_utils:add_header("", manifest, ManifestData)),
+    {ok, Response} = http:request(put, {Url, [], "application/json", JsonDoc}, [], []),
     case handle_response(Response) of
-        ok ->
-            {reply, ok, State, State#state.timeout};
-        {error, Error} ->
+        {ok, Code} ->
+            {reply, {ok, Code}, State, State#state.timeout};
+        {error, Code, Error} ->
             ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
             bds_event:log_error(ErrorMsg),
-            {reply, {error, ErrorMsg}, State, State#state.timeout}
+            {reply, {error, Code, Error}, State, State#state.timeout}
     end;
 handle_call({create_file, {FileData, User}}, _From, State) ->
     Url = create_url(State#state.host, State#state.port, User),
-    JsonData = rfc4627:encode(FileData),
-    JsonDoc = rfc4627:encode(jsondoc_utils:add_header("", file, JsonData)),
-    Headers = ["Content-Type: application/json"],
-    {ok, {_Result, _Headers, Body} = Response} = http:request(post, {Url, Headers, "application/json", JsonDoc}, [], []),
+    JsonDoc = rfc4627:encode(jsondoc_utils:add_header("", file, FileData)),
+    {ok, {_Result, _Headers, Body} = Response} = http:request(post, {Url, [], "application/json", JsonDoc}, [], []),
     case handle_response(Response) of
-        ok ->
+        {ok, Code} ->
             {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
             Id = jsondoc_utils:get_file_id(DecodedBody),
             bds_event:create_file(Id, Url),
-            {reply, {ok, Id}, State, State#state.timeout};
-        {error, Error} ->
+            {reply, {ok, Code, Id}, State, State#state.timeout};
+        {error, Code, Error} ->
             ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
             bds_event:log_error(ErrorMsg),
-            {reply, {error, ErrorMsg}, State, State#state.timeout}
+            {reply, {error, Code, Error}, State, State#state.timeout}
     end;
 handle_call({get_manifest_list, User}, _From, State) ->
     Url = create_view_query_url(State#state.host, State#state.port, User, ?MANIFEST_QUERY),
     {ok, {_Result, _Headers, Body} = Response} = http:request(get, {Url, []}, [], []),
     case handle_response(Response) of
-        ok ->
+        {ok, Code} ->
             {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
             ManifestList = 
                 jsondoc_utils:process_manifest_list(jsondoc_utils:get_docs_from_couchdb_response(DecodedBody),[]),
-            {reply, {ok, ManifestList}, State, State#state.timeout};
-        {error, Error} ->
+            {reply, {ok, Code, ManifestList}, State, State#state.timeout};
+        {error, Code, Error} ->
             ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
             bds_event:log_error(ErrorMsg),
-            {reply, {error, ErrorMsg}, State, State#state.timeout}
+            {reply, {error, Code, Error}, State, State#state.timeout}
     end;
 handle_call({get_manifest, {Id, User}}, _From, State) ->
     Url = create_url(State#state.host, State#state.port, User, Id),
     bds_event:get_manifest(Id, Url),
     {ok, {_Result, _Headers, Body} = Response} = http:request(get, {Url, []}, [], []),
     case handle_response(Response) of
-        ok ->
+        {ok, Code} ->
             {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
             Manifest = jsondoc_utils:strip_header(DecodedBody),
-            {reply, {ok, Manifest}, State, State#state.timeout};
-        {error, Error} ->
+            {reply, {ok, Code, Manifest}, State, State#state.timeout};
+        {error, Code, Error} ->
             ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
             bds_event:log_error(ErrorMsg),
-            {reply, {error, ErrorMsg}, State, State#state.timeout}
+            {reply, {error, Code, Error}, State, State#state.timeout}
     end;
 %% TODO: get_file code is the same as get_manifest, with only the event handling as a difference
 handle_call({get_file, {Id, User}}, _From, State) ->
@@ -285,14 +281,14 @@ handle_call({get_file, {Id, User}}, _From, State) ->
     bds_event:get_file(Id, Url),
     {ok, {_Result, _Headers, Body} = Response} = http:request(get, {Url, []}, [], []),
     case handle_response(Response) of
-        ok ->
+        {ok, Code} ->
             {ok, DecodedBody, _Raw} = rfc4627:decode(Body),
             File = jsondoc_utils:strip_header(DecodedBody),
-            {reply, {ok, File}, State, State#state.timeout};
-        {error, Error} ->
+            {reply, {ok, Code, File}, State, State#state.timeout};
+        {error, Code, Error} ->
             ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
             bds_event:log_error(ErrorMsg),
-            {reply, {error, ErrorMsg}, State, State#state.timeout}
+            {reply, {error, Code, ErrorMsg}, State, State#state.timeout}
     end.
 
 %% --------------------------------------------------------------------
@@ -368,25 +364,25 @@ handle_response({{Version, StatusCode, Result}, Headers, Body} = Args ) ->
 handle_response({{_Version, StatusCode, _Result}, _Headers, _Body}, noreport) ->
     case StatusCode of
         200 -> 
-            ok;
+            {ok, 200};
         201 ->
-            ok;
+            {ok, 201};
         202 ->
-            ok;
+            {ok, 202};
         304 ->
-            ok;
+            {ok, 304};
         400 ->
-            {error, "Incorrect syntax or could not be processed"};
+            {error, 400, "Incorrect syntax or could not be processed"};
         404 ->
-            {error, "No such document"};
+            {error, 404, "No such document"};
         405 ->
-            {error, "Incorrect method in request"};
+            {error, 405, "Incorrect method in request"};
         409 ->
-            {error, "A file of the same name already exists"};
+            {error, 409, "A file of the same name already exists"};
         412 ->
-            {error, "A user of the same name already exists"};
+            {error, 412, "A user of the same name already exists"};
         500 ->
-            {error, "An error occurred in the database"};
+            {error, 500, "An error occurred in the database"};
         _ ->
-            {error, "An unknown error occurred"}
+            {error, StatusCode, "An unknown error occurred"}
     end.
