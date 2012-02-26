@@ -26,6 +26,7 @@
 %% --------------------------------------------------------------------
 -define(DEFAULT_INI_FILE, "bds.ini").
 -define(MIN_DOC_STORE_VERSION, "1.0.0").
+-define(BDS_VERSION, "0.1.0").
 
 %% --------------------------------------------------------------------
 %% Records
@@ -46,6 +47,7 @@
 %%          {error, Reason}
 %% --------------------------------------------------------------------
 start(_Type, _StartArgs) ->
+	io:format("Starting Bodleian Document Server v~s.~n", [?BDS_VERSION]),
 	%% Load configuration
 	case load_configuration() of
         file_not_found ->

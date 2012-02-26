@@ -89,17 +89,21 @@ handler(Request) ->
 init([HttpOpts, HttpsOpts]) ->
 	case HttpOpts of
 		[] ->
+			io:format("Started Listening on Port ~B.~n", [?DEFAULT_HTTP_PORT]),
 			{ok, Http} = mochiweb_http:start(?DEFAULT_HTTP_OPTS);
 		HttpOpts ->
+			io:format("Started Listening on Port ~B.~n", [proplists:lookup(port, HttpOpts)]),
 			{ok, Http} = mochiweb_http:start(HttpOpts)
 	end,
 	case HttpsOpts of
 		[] ->
-			{ok, Https} = mochiweb_http:start(?DEFAULT_HTTPS_OPTS);
+			io:format("Started Secure Listening on Port ~B.~n", [?DEFAULT_HTTPS_PORT]),
+    		{ok, Https} = mochiweb_http:start(?DEFAULT_HTTPS_OPTS);
 		HttpsOpts ->
-			{ok, Https} = mochiweb_http:start(HttpsOpts)
+			io:format("Started Secure Listening on Port ~B.~n", [proplists:lookup(port, HttpsOpts)]),
+    		{ok, Https} = mochiweb_http:start(HttpsOpts)
 	end,
-    State = #state{http=Http, https=Https},
+	State = #state{http=Http, https=Https},
     {ok, State}.
 
 %% --------------------------------------------------------------------
