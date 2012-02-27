@@ -46,7 +46,8 @@
 %%          {ok, Pid, State} |
 %%          {error, Reason}
 %% --------------------------------------------------------------------
-start(_Type, _StartArgs) ->
+start(_Type, _StartArgs) ->    
+    io:format("-----------------------------------------------~n"),
 	io:format("Starting Bodleian Document Server v~s.~n", [?BDS_VERSION]),
 	%% Load configuration
 	case load_configuration() of
@@ -90,6 +91,8 @@ load_configuration() ->
 	end.
 
 ensure_document_store_version() ->
+    io:format("-----------------------------------------------~n"),
+    io:format("Locating backend document store~n"),
     case bds_connection:get_version() of 
 		{ok, Version} ->
 			case bodleian_utils:compare_versions(?MIN_DOC_STORE_VERSION, 

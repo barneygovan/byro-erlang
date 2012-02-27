@@ -87,6 +87,8 @@ handler(Request) ->
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
 init([HttpOpts, HttpsOpts]) ->
+    io:format("-----------------------------------------------~n"),
+    io:format("Starting REST interfaces~n"),
 	case HttpOpts of
 		[] ->
 			io:format("Started Listening on Port ~B.~n", [?DEFAULT_HTTP_PORT]),
@@ -103,6 +105,7 @@ init([HttpOpts, HttpsOpts]) ->
 			io:format("Started Secure Listening on Port ~B.~n", [proplists:lookup(port, HttpsOpts)]),
     		{ok, Https} = mochiweb_http:start(HttpsOpts)
 	end,
+    io:format("-----------------------------------------------~n"),
 	State = #state{http=Http, https=Https},
     {ok, State}.
 
