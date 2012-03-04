@@ -85,9 +85,9 @@ create_file(FileData, User) ->
 
 update_file(Id, FileData, User) ->
     {ok, Pid} = bds_connection:create(),
-    bds_connection:update_file(Pid, Id, FileData, User),
+    Result = bds_connection:update_file(Pid, Id, FileData, User),
     bds_connection:delete(Pid),
-    ok.
+    Result.
 
 delete_file(Id, User) ->
     {ok, Pid} = bds_connection:create(),
