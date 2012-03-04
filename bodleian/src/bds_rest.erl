@@ -215,14 +215,20 @@ handle_put(Request) ->
 			
 			case bodleian:update_manifest(ManifestName, Request:recv_body(), UserName) of
 				{ok, Code} ->
-					ok;
+					Request:respond({Code, [], "OK"});
 				{error, Code, Error} ->
 					Request:respond({Code, [], Error})
 			end;
 		"file" ->
 			[UserName|FileParts] = Parts2,
 			[FileName|[]] = FileParts,
-			ok
+			
+			case bodleian:update_file(FileName, Request:recv_body(), UserName) of
+				{ok, Code} ->
+					Request:respond({Code, [], "Updated"});
+				{error, Code, Error} ->
+					Request:respond({Code, [], Error})
+			end
 	end.
 
 

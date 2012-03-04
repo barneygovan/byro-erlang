@@ -61,9 +61,9 @@ update_manifest(Id, ManifestData, User) when is_list(ManifestData) ->
 	update_manifest(Id, list_to_binary(ManifestData), User);
 update_manifest(Id, ManifestData, User) when is_binary(ManifestData) ->
     {ok, Pid} = bds_connection:create(),
-    bds_connection:update_manifest(Pid, Id, ManifestData, User),
+    Result = bds_connection:update_manifest(Pid, Id, ManifestData, User),
     bds_connection:delete(Pid),
-    ok.
+    Result.
 
 delete_manifest(Id, User) ->
     {ok, Pid} = bds_connection:create(),

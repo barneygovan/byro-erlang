@@ -3,7 +3,7 @@
 %% Description: TODO: Add description to jsondoc_utils
 -module(jsondoc_utils).
 
--record(jsondoc, {'_id', '_ver', type, body}).
+-record(jsondoc, {'_id', '_rev', type, body}).
 -record(couchdb_response, {total_rows, offset, rows}).
 -record(manifestdoc, {id, key, value}).
 -record(create_response, {ok, id, rev}).
@@ -17,6 +17,7 @@
 %% Exported Functions
 %%
 -export([add_header/3,
+		 add_header/4,
          strip_header/1,
          get_version/1,
          get_docs_from_couchdb_response/1,
@@ -28,13 +29,13 @@
 %% API Functions
 %%
 add_header(Id, Type, Body) ->
-    case Id of
-        [] ->
-            Doc = #jsondoc{type=Type, body=Body};
-        _ ->
-            Doc = #jsondoc{'_id'=Id, type=Type, body=Body}
-    end,
-    rfc4627:from_record(Doc, jsondoc, record_info(fields, jsondoc)).
+	add_header(Id, Type, Body, []).
+
+add_header(Id, Type, Body, Revision) ->
+	Doc = #jsondoc{type=Type, body=Body},
+	Doc1 = add_doc_id(Doc, Id),
+	Doc2 = add_revision(Doc1, Revision),
+    rfc4627:from_record(Doc2, jsondoc, record_info(fields, jsondoc)).
 
 strip_header(Doc) ->
     JsonRecord = rfc4627:to_record(Doc, #jsondoc{}, record_info(fields, jsondoc)),
@@ -70,4 +71,18 @@ get_file_id(FileResponse) ->
 %%
 %% Local Functions
 %%
+add_doc_id(Doc, Id) ->
+	case Id of
+		Id when length(Id) > 0 ->
+			Doc#jsondoc{'_id'=Id};
+		_ ->
+			Doc
+	end.
 
+add_revision(Doc, Revision) ->
+	case Revision of
+		R when length(R) > 0 ->
+			Doc#jsondoc{'_rev'=Revision};
+		_ ->
+			Doc
+	end.

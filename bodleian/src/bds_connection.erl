@@ -118,7 +118,7 @@ create_manifest(Pid, Id, ManifestData, User) ->
     gen_server:call(Pid, {create_manifest, {Id, ManifestData, User}}).
 
 update_manifest(Pid, Id, ManifestData, User) ->
-    gen_server:cast(Pid, {update_manifest, {Id, ManifestData, User}}).
+    gen_server:call(Pid, {update_manifest, {Id, ManifestData, User}}).
 
 delete_manifest(Pid, Id, User) ->
     gen_server:cast(Pid, {delete_manifest, {Id, User}}).
@@ -130,7 +130,7 @@ create_file(Pid, FileData, User) ->
     gen_server:call(Pid, {create_file, {FileData, User}}).
 
 update_file(Pid, Id, FileData, User) ->
-    gen_server:cast(Pid, {update_file, {Id, FileData, User}}).
+    gen_server:call(Pid, {update_file, {Id, FileData, User}}).
 
 delete_file(Pid, Id, User) ->
     gen_server:cast(Pid, {delete_file, {Id, User}}).
@@ -289,7 +289,52 @@ handle_call({get_file, {Id, User}}, _From, State) ->
             ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
             bds_event:log_error(ErrorMsg),
             {reply, {error, Code, ErrorMsg}, State, State#state.timeout}
-    end.
+    end;
+handle_call({update_manifest, {Id, ManifestData, User}}, _From, State) ->
+	Url = create_url(State#state.host, State#state.port, User, Id),
+	%% TODO: log event
+	%% first get the current document version
+	{ok, {_Result, Headers, _Body}=HeadResponse} = http:request(head, {Url, []}, [], []),
+	case handle_response(HeadResponse) of
+		{ok, 200} ->
+			Revision = proplists:get_value("etag", Headers),
+			JsonDoc = rfc4627:encode(jsondoc_utils:add_header("", manifest, ManifestData, string:strip(Revision, both, $"))),
+			{ok, PutResponse} = http:request(put, {Url, [], "application/json", JsonDoc}, [], []),
+			case handle_response(PutResponse) of
+				{ok, Code} ->
+					{reply, {ok, Code}, State#state.timeout};
+				{error, Code, Error} ->
+					ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
+					bds_event:log_error(ErrorMsg),
+					{reply, {error, Code, Error}, State, State#state.timeout}
+			end;
+		{error, Code, Error} ->
+			ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
+			bds_event:log_error(ErrorMsg),
+			{reply, {error, Code, Error}, State, State#state.timeout}
+	end;
+handle_call({update_file, {Id, FileData, User}}, _From, State) ->
+	Url = create_url(State#state.host, State#state.port, user, Id),
+	%% TODO: log event
+	{ok, {_Result, Headers, _Body}=HeadResponse} = http:request(head, {Url, []}, [], []),
+	case handle_response(HeadResponse) of
+		{ok, 200} ->
+			Revision = proplists:get_value("etag", Headers),
+			JsonDoc = rfc4627:encode(jsondoc_utils:add_header("", file, FileData, Revision)),
+			{ok, PutResponse} = http:request(put, {Url, [], "application/json"}, JsonDoc, [], []),
+			case handle_response(PutResponse) of
+				{ok, Code} ->
+					{reply, {ok, Code}, State#state.timeout};
+				{error, Code, Error} ->
+					ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
+					bds_event:log_error(ErrorMsg),
+					{reply, {error, Code, Error}, State, State#state.timeout}
+			end;
+		{error, Code, Error} ->
+			ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
+			bds_event:log_error(ErrorMsg),
+			{reply, {error, Code, Error}, State, State#state.timeout}
+	end.
 
 %% --------------------------------------------------------------------
 %% Function: handle_cast/2
@@ -300,11 +345,7 @@ handle_call({get_file, {Id, User}}, _From, State) ->
 %% --------------------------------------------------------------------
 handle_cast(delete, State) ->
     {stop, normal, State};
-handle_cast({update_manifest, {Id, ManifestData, User}}, State) ->
-    {noreply, State, State#state.timeout};
 handle_cast({delete_manifest, {Id, User}}, State) ->
-    {noreply, State, State#state.timeout};
-handle_cast({update_file, {Id, FileData, User}}, State) ->
     {noreply, State, State#state.timeout};
 handle_cast({delete_file, {Id, User}}, State) ->
     {noreply, State, State#state.timeout}.
