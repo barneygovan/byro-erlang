@@ -163,7 +163,6 @@ code_change(_OldVsn, State, _Extra) ->
 %% --------------------------------------------------------------------
 handle_get(Request) ->
     Path = Request:get(path),
-	io:format("Requesting: GET ~s~n", [Path]),
     Parts = string:tokens(Path, "/"),
     [ResourceType|Parts2] = Parts,
     case ResourceType of 
@@ -203,7 +202,6 @@ handle_get(Request) ->
 
 handle_put(Request) ->
     Path = Request:get(path),
-	io:format("Requesting: PUT ~s~n", [Path]),
 	Parts = string:tokens(Path, "/"),
 	[ResourceType|Parts2] = Parts,
 	case ResourceType of
@@ -228,7 +226,9 @@ handle_put(Request) ->
 					Request:respond({Code, [], "Updated"});
 				{error, Code, Error} ->
 					Request:respond({Code, [], Error})
-			end
+			end;
+        _Other ->
+            Request:respond({400, [], "Bad Request"})
 	end.
 
 
@@ -253,11 +253,30 @@ handle_post(Request) ->
 					Request:respond({Code, [], []});
 				{error, Code, Error} ->
 					Request:respond({Code, [], Error})
-			end
+			end;
+        _Other ->
+            Request:respond({400, [], "Bad Request"})
 	end.
 
 handle_delete(Request) ->
     Path = Request:get(path),
-    ok.
+    Parts = string:tokens(Path, "/"),
+    [ResourceType|Parts2] = Parts,
+    case ResourceType of
+        "user" ->
+            Request:respond({401, [], <<"Unauthorized">>});
+        "manifest" ->
+            [UserName|ManifestParts] = Parts2,
+            [ManifestName|[]] = ManifestParts,
+            bodleian:delete_manifest(ManifestName, UserName),
+            Request:respond({202, [], "Accepted"});
+        "file" ->
+            [UserName|FileParts] = Parts2,
+            [FileName|[]] = FileParts,
+            bodleian:delete_file(FileName, UserName),
+            Request:respond({202, [], "Accepted"});
+        _Other ->
+            Request:respond({400, [], "Bad Request"})
+    end.
 
 

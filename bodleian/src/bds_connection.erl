@@ -320,7 +320,7 @@ handle_call({update_file, {Id, FileData, User}}, _From, State) ->
 	case handle_response(HeadResponse) of
 		{ok, 200} ->
 			Revision = proplists:get_value("etag", Headers),
-			JsonDoc = rfc4627:encode(jsondoc_utils:add_header("", file, FileData, Revision)),
+			JsonDoc = rfc4627:encode(jsondoc_utils:add_header("", file, FileData, string:strip(Revision, both, $"))),
 			{ok, PutResponse} = http:request(put, {Url, [], "application/json"}, JsonDoc, [], []),
 			case handle_response(PutResponse) of
 				{ok, Code} ->
@@ -346,8 +346,31 @@ handle_call({update_file, {Id, FileData, User}}, _From, State) ->
 handle_cast(delete, State) ->
     {stop, normal, State};
 handle_cast({delete_manifest, {Id, User}}, State) ->
+    Url = create_url(State#state.host, State#state.port, User, Id),
+    %% TODO: log access
+    {ok, {_Result, Headers, _Body}=HeadResponse} = http:request(head, {Url, []}, [], []),
+    case handle_response(HeadResponse) of
+        {ok, 200} ->
+            Revision = proplists:get_value("etag", Headers),
+            DeleteUrl = Url ++ "?rev=" ++ string:strip(Revision, both, $"),
+            http:request(delete, {DeleteUrl, []}, [], []);
+        {error, _Code, Error} ->
+            ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
+            bds_event:log_error(ErrorMsg)
+    end,    
     {noreply, State, State#state.timeout};
 handle_cast({delete_file, {Id, User}}, State) ->
+    Url = create_url(State#state.host, State#state.port, User, Id),
+    {ok, {_Result, Headers, _Body}=HeadResponse} = http:request(head, {Url, []}, [], []),
+    case handle_response(HeadResponse) of
+        {ok, 200} ->
+            Revision = proplists:get_value("etag", Headers),
+            DeleteUrl = Url ++ "?rev=" ++ string:strip(Revision, both, $"),
+            http:request(delete, {DeleteUrl, []}, [], []);
+        {error, _Code, Error} ->
+            ErrorMsg = io_lib:format("~s: ~s", [Error, Url]),
+            bds_event:log_error(ErrorMsg)
+    end,  
     {noreply, State, State#state.timeout}.
 
 %% --------------------------------------------------------------------
