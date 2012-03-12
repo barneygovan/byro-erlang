@@ -314,7 +314,7 @@ handle_call({update_manifest, {Id, ManifestData, User}}, _From, State) ->
 			{reply, {error, Code, Error}, State, State#state.timeout}
 	end;
 handle_call({update_file, {Id, FileData, User}}, _From, State) ->
-	Url = create_url(State#state.host, State#state.port, user, Id),
+	Url = create_url(State#state.host, State#state.port, User, Id),
 	%% TODO: log event
 	{ok, {_Result, Headers, _Body}=HeadResponse} = http:request(head, {Url, []}, [], []),
 	case handle_response(HeadResponse) of
