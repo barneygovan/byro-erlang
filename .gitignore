@@ -3,3 +3,9 @@ deps
 *.o
 *.beam
 *.plt
+*.swp
+*.wam
+erl_crash.dump
+logs/
+.settings/
+.directory
